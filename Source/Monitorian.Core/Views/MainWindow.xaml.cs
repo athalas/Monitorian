@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 
 using Monitorian.Core.Models;
 using Monitorian.Core.ViewModels;
@@ -11,31 +13,72 @@ namespace Monitorian.Core.Views;
 
 public partial class MainWindow : Window
 {
+   private const int HotkeyId = 0x7248;
+	private const uint MOD_ALT = 0x0001;
+	private const uint MOD_CONTROL = 0x0002;
+	private const uint WM_HOTKEY = 0x0312;
+
 	private readonly StickWindowMover _mover;
+  private readonly AppControllerCore _controller;
+	private readonly IntPtr _windowHandle;
+	private readonly HwndSource _hwndSource;
 	public MainWindowViewModel ViewModel => (MainWindowViewModel)this.DataContext;
+
+	[DllImport("user32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
 	public MainWindow(AppControllerCore controller)
 	{
+       _controller = controller ?? throw new ArgumentNullException(nameof(controller));
 		LanguageService.Switch();
 
 		InitializeComponent();
 
-		this.DataContext = new MainWindowViewModel(controller);
+     this.DataContext = new MainWindowViewModel(_controller);
 
-		_mover = new StickWindowMover(this, controller.NotifyIconContainer.NotifyIcon)
+		_windowHandle = new WindowInteropHelper(this).EnsureHandle();
+		_hwndSource = HwndSource.FromHwnd(_windowHandle);
+		_hwndSource?.AddHook(WndProc);
+		RegisterHotKey(_windowHandle, HotkeyId, MOD_CONTROL | MOD_ALT, (uint)KeyInterop.VirtualKeyFromKey(Key.Home));
+
+      _mover = new StickWindowMover(this, _controller.NotifyIconContainer.NotifyIcon)
 		{
 			KeepsDistance = true
 		};
 		_mover.ForegroundWindowChanged += OnDeactivated;
 
-		controller.WindowPainter.Add(this);
-		controller.WindowPainter.ThemeChanged += (_, _) =>
+     _controller.WindowPainter.Add(this);
+		_controller.WindowPainter.ThemeChanged += (_, _) =>
 		{
 			ViewModel.MonitorsView.Refresh();
 		};
 		//controller.WindowPainter.AccentColorChanged += (_, _) =>
 		//{
 		//};
+	}
+
+	protected override void OnClosed(EventArgs e)
+	{
+		UnregisterHotKey(_windowHandle, HotkeyId);
+		_hwndSource?.RemoveHook(WndProc);
+
+		base.OnClosed(e);
+	}
+
+	private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+	{
+		if (msg == WM_HOTKEY && wParam.ToInt32() == HotkeyId)
+		{
+			_controller.RestoreAllMonitors();
+			handled = true;
+		}
+
+		return IntPtr.Zero;
 	}
 
 	#region Show/Hide

@@ -282,6 +282,7 @@ internal class MonitorConfiguration
 					isHighLevelBrightnessSupported: isHighLevelSupported,
 					isLowLevelBrightnessSupported: vcpCodes.ContainsKey((byte)VcpCode.Luminance),
 					isContrastSupported: vcpCodes.ContainsKey((byte)VcpCode.Contrast),
+                    isPowerModeSupported: vcpCodes.ContainsKey((byte)VcpCode.PowerMode),
 					capabilitiesCodes: FilterVcpCodes(vcpCodes),
 					capabilitiesString: (verbose ? capabilitiesString : null),
 					capabilitiesReport: (verbose ? MakeCapabilitiesReport(vcpCodes) : null),
@@ -291,7 +292,8 @@ internal class MonitorConfiguration
 		return new MonitorCapability(
 			isHighLevelBrightnessSupported: isHighLevelSupported,
 			isLowLevelBrightnessSupported: false,
-			isContrastSupported: false);
+            isContrastSupported: false,
+			isPowerModeSupported: false);
 
 		static string MakeCapabilitiesReport(IReadOnlyDictionary<byte, byte[]> vcpCodeValues)
 		{
@@ -713,24 +715,28 @@ internal class MonitorCapability
 	[DataMember(Order = 2)]
 	public bool IsContrastSupported { get; }
 
-	[DataMember(Order = 3)]
+ [DataMember(Order = 3)]
+	public bool IsPowerModeSupported { get; }
+
+	[DataMember(Order = 4)]
 	public bool IsPrecleared { get; }
 
 	public IReadOnlyDictionary<byte, IReadOnlyList<byte>> CapabilitiesCodes { get; }
 
-	[DataMember(Order = 4)]
+ [DataMember(Order = 5)]
 	public string CapabilitiesString { get; }
 
-	[DataMember(Order = 5)]
+ [DataMember(Order = 6)]
 	public string CapabilitiesReport { get; }
 
-	[DataMember(Order = 6)]
+ [DataMember(Order = 7)]
 	public string CapabilitiesData { get; }
 
 	public MonitorCapability(
 		bool isHighLevelBrightnessSupported,
 		bool isLowLevelBrightnessSupported,
 		bool isContrastSupported,
+     bool isPowerModeSupported = false,
 		IReadOnlyDictionary<byte, byte[]> capabilitiesCodes = null,
 		string capabilitiesString = null,
 		string capabilitiesReport = null,
@@ -738,6 +744,7 @@ internal class MonitorCapability
 			isHighLevelBrightnessSupported: isHighLevelBrightnessSupported,
 			isLowLevelBrightnessSupported: isLowLevelBrightnessSupported,
 			isContrastSupported: isContrastSupported,
+            isPowerModeSupported: isPowerModeSupported,
 			isPrecleared: false,
 			capabilitiesCodes: capabilitiesCodes,
 			capabilitiesString: capabilitiesString,
@@ -749,6 +756,7 @@ internal class MonitorCapability
 		bool isHighLevelBrightnessSupported,
 		bool isLowLevelBrightnessSupported,
 		bool isContrastSupported,
+      bool isPowerModeSupported,
 		bool isPrecleared,
 		IReadOnlyDictionary<byte, byte[]> capabilitiesCodes,
 		string capabilitiesString,
@@ -758,6 +766,7 @@ internal class MonitorCapability
 		this.IsHighLevelBrightnessSupported = isHighLevelBrightnessSupported;
 		this.IsLowLevelBrightnessSupported = isLowLevelBrightnessSupported;
 		this.IsContrastSupported = isContrastSupported;
+       this.IsPowerModeSupported = isPowerModeSupported;
 		this.IsPrecleared = isPrecleared;
 		this.CapabilitiesCodes = (capabilitiesCodes is not null) ? new ReadOnlyDictionary<byte, IReadOnlyList<byte>>(capabilitiesCodes.ToDictionary(x => x.Key, x => (x.Value is not null) ? (IReadOnlyList<byte>)Array.AsReadOnly(x.Value) : null)) : null;
 		this.CapabilitiesString = capabilitiesString;
@@ -770,6 +779,7 @@ internal class MonitorCapability
 		new(isHighLevelBrightnessSupported: false,
 			isLowLevelBrightnessSupported: true,
 			isContrastSupported: true,
+         isPowerModeSupported: false,
 			isPrecleared: true,
 			capabilitiesCodes: null,
 			capabilitiesString: null,

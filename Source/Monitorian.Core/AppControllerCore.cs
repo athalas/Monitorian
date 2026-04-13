@@ -212,6 +212,14 @@ public class AppControllerCore
 		window.Show();
 	}
 
+	public void RestoreAllMonitors()
+	{
+		foreach (var monitor in Monitors.ToArray())
+		{
+			monitor.IsSleepModeEnabled = false;
+		}
+	}
+
 	protected virtual async void OnSettingsInitiated()
 	{
 		if (Settings.UsesAccentColor)
@@ -411,7 +419,11 @@ public class AppControllerCore
 						{
 							return Task.Run(() =>
 							{
-								if (x.UpdateBrightness())
+                               if (x.IsSleepModeEnabled)
+								{
+									x.IsTarget = true;
+								}
+								else if (x.UpdateBrightness())
 								{
 									x.IsTarget = true;
 								}
@@ -465,8 +477,8 @@ public class AppControllerCore
 						.Where(x => x.IsTarget)
 						.SelectMany(x => new[]
 						{
-							Task.Run(() => x.UpdateBrightness()),
-							(x.IsContrastChanging ? Task.Run(() => x.UpdateContrast()) : Task.CompletedTask),
+                           x.IsSleepModeEnabled ? Task.CompletedTask : Task.Run(() => x.UpdateBrightness()),
+							(x.IsSleepModeEnabled ? Task.CompletedTask : (x.IsContrastChanging ? Task.Run(() => x.UpdateContrast()) : Task.CompletedTask)),
 						}));
 				}
 			}
@@ -485,6 +497,8 @@ public class AppControllerCore
 		var monitor = !string.IsNullOrEmpty(instanceName)
 			? Monitors.FirstOrDefault(x => instanceName.StartsWith(x.DeviceInstanceId, StringComparison.OrdinalIgnoreCase))
 			: Monitors.FirstOrDefault(x => x.IsInternal);
+		if (monitor is { IsSleepModeEnabled: true })
+			return;
 
 		EnsureUnisonWorkable(monitor);
 		monitor?.UpdateBrightness(brightness);
@@ -493,6 +507,8 @@ public class AppControllerCore
 	protected virtual void Update(string deviceInstanceId, float sdrWhiteLevel)
 	{
 		var monitor = Monitors.FirstOrDefault(x => deviceInstanceId == x.DeviceInstanceId);
+		if (monitor is { IsSleepModeEnabled: true })
+			return;
 
 		EnsureUnisonWorkable(monitor);
 		monitor?.UpdateBrightness((int)sdrWhiteLevel);

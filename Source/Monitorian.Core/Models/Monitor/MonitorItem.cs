@@ -18,6 +18,7 @@ internal abstract class MonitorItem : IMonitor
 
 	public virtual bool IsBrightnessSupported => IsReachable;
 	public virtual bool IsContrastSupported => false;
+  public virtual bool IsPowerModeSupported => false;
 	public virtual bool IsPrecleared => false;
 
 	public MonitorItem(

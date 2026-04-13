@@ -18,6 +18,7 @@ public interface IMonitor : IDisposable
 	bool IsReachable { get; }
 	bool IsBrightnessSupported { get; }
 	bool IsContrastSupported { get; }
+	bool IsPowerModeSupported { get; }
 
 	int Brightness { get; }
 	int BrightnessSystemAdjusted { get; }

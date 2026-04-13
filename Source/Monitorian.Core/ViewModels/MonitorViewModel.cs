@@ -11,6 +11,10 @@ namespace Monitorian.Core.ViewModels;
 
 public class MonitorViewModel : ViewModelBase
 {
+ private const byte PowerModeCode = 0xD6;
+	private const int PowerModeOnValue = 1;
+	private const int PowerModeStandbyValue = 2;
+
 	private readonly AppControllerCore _controller;
 	public SettingsCore Settings => _controller.Settings;
 
@@ -52,6 +56,7 @@ public class MonitorViewModel : ViewModelBase
 	public Rect MonitorRect => _monitor.MonitorRect;
 	public ConnectionType Connection => _monitor.Connection;
 	public bool IsInternal => _monitor.IsInternal;
+	public bool IsSleepModeSupported => _monitor.IsPowerModeSupported;
 
 	#region Customization
 
@@ -131,6 +136,12 @@ public class MonitorViewModel : ViewModelBase
 		get => _monitor.Brightness;
 		set
 		{
+          if (IsSleepModeEnabled)
+			{
+				if (!SetSleepMode(false))
+					return;
+			}
+
 			if (_monitor.Brightness == value)
 				return;
 
@@ -144,8 +155,27 @@ public class MonitorViewModel : ViewModelBase
 	public int BrightnessSystemAdjusted => _monitor.BrightnessSystemAdjusted;
 	public int BrightnessUnison => Brightness;
 
+	public bool IsSleepModeEnabled
+	{
+		get => _isSleepModeEnabled;
+		set
+		{
+            if (_isSleepModeEnabled == value)
+				return;
+
+			if (!SetSleepMode(value))
+			{
+				SetProperty(ref _isSleepModeEnabled, !value);
+			}
+		}
+	}
+	private bool _isSleepModeEnabled;
+
 	public bool UpdateBrightness(int value = -1)
 	{
+        if (IsSleepModeEnabled)
+			return true;
+
 		AccessResult result;
 		lock (_lock)
 		{
@@ -219,6 +249,12 @@ public class MonitorViewModel : ViewModelBase
 
 	private bool SetBrightness(int brightness, bool isCycle)
 	{
+      if (IsSleepModeEnabled)
+		{
+			if (!SetSleepMode(false))
+				return false;
+		}
+
 		if (brightness < RangeLowest)
 			brightness = isCycle ? RangeHighest : RangeLowest;
 		else if (RangeHighest < brightness)
@@ -258,6 +294,38 @@ public class MonitorViewModel : ViewModelBase
 
 	public DateTimeOffset BrightnessUpdatedTime { get; private set; }
 
+	private bool SetSleepMode(bool isEnabled)
+	{
+        AccessResult result;
+        SetProperty(ref _isSleepModeEnabled, isEnabled);
+
+		lock (_lock)
+		{
+           (result, _) = _monitor.SetValue(PowerModeCode, isEnabled ? PowerModeStandbyValue : PowerModeOnValue);
+		}
+
+		switch (result.Status)
+		{
+			case AccessStatus.Succeeded:
+				return true;
+
+			default:
+				_controller.OnMonitorAccessFailed(result);
+
+				switch (result.Status)
+				{
+					case AccessStatus.DdcDataInvalid:
+					case AccessStatus.DdcMessageInvalid:
+					case AccessStatus.TransmissionFailed:
+					case AccessStatus.NoLongerExist:
+						_controller.OnMonitorsChangeFound();
+						break;
+				}
+                SetProperty(ref _isSleepModeEnabled, !isEnabled);
+				return false;
+		}
+	}
+
 	#endregion
 
 	#region Contrast
@@ -280,6 +348,12 @@ public class MonitorViewModel : ViewModelBase
 		get => _monitor.Contrast;
 		set
 		{
+            if (IsSleepModeEnabled)
+			{
+				if (!SetSleepMode(false))
+					return;
+			}
+
 			if (_monitor.Contrast == value)
 				return;
 
@@ -292,6 +366,9 @@ public class MonitorViewModel : ViewModelBase
 
 	public bool UpdateContrast()
 	{
+        if (IsSleepModeEnabled)
+			return true;
+
 		AccessResult result;
 		lock (_lock)
 		{
@@ -348,6 +425,12 @@ public class MonitorViewModel : ViewModelBase
 
 	public bool SetContrast(int contrast)
 	{
+        if (IsSleepModeEnabled)
+        {
+			if (!SetSleepMode(false))
+				return false;
+		}
+
 		contrast = Math.Min(100, Math.Max(0, contrast));
 
 		AccessResult result;

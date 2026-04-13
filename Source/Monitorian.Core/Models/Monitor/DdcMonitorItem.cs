@@ -15,6 +15,7 @@ internal class DdcMonitorItem : MonitorItem
 
 	public override bool IsBrightnessSupported => _capability.IsBrightnessSupported;
 	public override bool IsContrastSupported => _capability.IsContrastSupported;
+  public override bool IsPowerModeSupported => _capability.IsPowerModeSupported;
 	public override bool IsPrecleared => _capability.IsPrecleared;
 
 	public DdcMonitorItem(
