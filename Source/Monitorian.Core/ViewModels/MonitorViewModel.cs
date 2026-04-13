@@ -446,6 +446,7 @@ public class MonitorViewModel : ViewModelBase
 		switch (result.Status)
 		{
 			case AccessStatus.Succeeded:
+                NotifyBrightnessChanged();
 				return true;
 
 			default:
@@ -477,6 +478,8 @@ public class MonitorViewModel : ViewModelBase
 		switch (result.Status)
 		{
 			case AccessStatus.Succeeded:
+                NotifyBrightnessChanged();
+				_sleepModeBrightness = -1;
 				return true;
 
 			default:
@@ -493,6 +496,14 @@ public class MonitorViewModel : ViewModelBase
 				}
 				return false;
 		}
+	}
+
+	private void NotifyBrightnessChanged()
+	{
+		BrightnessUpdatedTime = DateTimeOffset.Now;
+		OnPropertyChanged(nameof(BrightnessUnison)); // This must be prior to Brightness.
+		OnPropertyChanged(nameof(Brightness));
+		OnPropertyChanged(nameof(BrightnessSystemAdjusted));
 	}
 
 	private bool TryShowBlackOverlay()
