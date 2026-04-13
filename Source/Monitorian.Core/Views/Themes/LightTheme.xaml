@@ -16,6 +16,22 @@
 	<SolidColorBrush x:Key="App.Background.Plain" Color="#FFE4E4E4"/>
 	<SolidColorBrush x:Key="App.Background.Translucent" Color="#DBE6E6E6"/>
 
+	<SolidColorBrush x:Key="CheckBox.Border" Color="#FF7A7A7A"/>
+	<SolidColorBrush x:Key="CheckBox.Border.MouseOver" Color="#FF5F5F5F"/>
+	<SolidColorBrush x:Key="CheckBox.Border.Pressed" Color="#FF484848"/>
+	<SolidColorBrush x:Key="CheckBox.Border.Checked" Color="{DynamicResource App.Background.Accent.StaticColor}"/>
+	<SolidColorBrush x:Key="CheckBox.Border.Checked.MouseOver" Color="{DynamicResource App.Background.Accent.MouseOverColor}"/>
+	<SolidColorBrush x:Key="CheckBox.Border.Checked.Pressed" Color="{DynamicResource App.Background.Accent.PressedColor}"/>
+
+	<SolidColorBrush x:Key="CheckBox.Background" Color="#00FFFFFF"/>
+	<SolidColorBrush x:Key="CheckBox.Background.MouseOver" Color="#14000000"/>
+	<SolidColorBrush x:Key="CheckBox.Background.Pressed" Color="#24000000"/>
+	<SolidColorBrush x:Key="CheckBox.Background.Checked" Color="{DynamicResource App.Background.Accent.StaticColor}"/>
+	<SolidColorBrush x:Key="CheckBox.Background.Checked.MouseOver" Color="{DynamicResource App.Background.Accent.MouseOverColor}"/>
+	<SolidColorBrush x:Key="CheckBox.Background.Checked.Pressed" Color="{DynamicResource App.Background.Accent.PressedColor}"/>
+
+	<SolidColorBrush x:Key="CheckBox.CheckMark" Color="White"/>
+
 	<Color x:Key="Icon.Foreground.NormalColor">#FF909090</Color>
 	<Color x:Key="Icon.Background.MouseOverColor">#336A6A6A</Color>
 	<Color x:Key="Icon.Background.PressedColor">#556A6A6A</Color>
