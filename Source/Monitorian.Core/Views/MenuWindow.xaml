@@ -146,6 +146,27 @@
 						  IsChecked="{Binding Settings.EnablesIdentity}"/>
 		</ContentControl>
 
+		<ContentControl Style="{StaticResource MenuItemStyle}">
+			<ToggleButton Padding="8,4"
+						  Style="{StaticResource CheckButtonItemStyle}"
+						  Content="Enable Sleep mode by DDC/CI"
+						  IsChecked="{Binding Settings.EnablesSleepModeByDdcCi}"/>
+		</ContentControl>
+
+		<ContentControl Style="{StaticResource MenuItemStyle}">
+			<ToggleButton Padding="8,4"
+						  Style="{StaticResource CheckButtonItemStyle}"
+						  Content="Enable Brightness zero mode"
+						  IsChecked="{Binding Settings.EnablesSleepModeByBrightnessZero}"/>
+		</ContentControl>
+
+		<ContentControl Style="{StaticResource MenuItemStyle}">
+			<ToggleButton Padding="8,4"
+						  Style="{StaticResource CheckButtonItemStyle}"
+						  Content="Enable Black overlay mode"
+						  IsChecked="{Binding Settings.EnablesSleepModeByBlackOverlay}"/>
+		</ContentControl>
+
 		<Separator Style="{StaticResource MenuSeparatorStyle}"/>
 
 		<!-- Close -->

@@ -292,6 +292,14 @@ public class AppControllerCore
 					OperationRecorder.Disable();
 
 				break;
+
+			case nameof(Settings.EnablesSleepModeByDdcCi):
+			case nameof(Settings.EnablesSleepModeByBrightnessZero):
+			case nameof(Settings.EnablesSleepModeByBlackOverlay):
+				foreach (var m in Monitors)
+					m.RefreshSleepModeSettings();
+
+				break;
 		}
 	}
 

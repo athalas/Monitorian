@@ -76,8 +76,14 @@ public class MonitorViewModel : ViewModelBase
 	public Rect MonitorRect => _monitor.MonitorRect;
 	public ConnectionType Connection => _monitor.Connection;
 	public bool IsInternal => _monitor.IsInternal;
-  public bool IsSleepModeSupported => 0 < GetSupportedSleepModeMethods().Length;
+    public bool IsSleepModeSupported => 0 < GetSupportedSleepModeMethods().Length;
 	public string SleepModeToolTip => BuildSleepModeToolTip();
+
+	public void RefreshSleepModeSettings()
+	{
+		OnPropertyChanged(nameof(IsSleepModeSupported));
+		OnPropertyChanged(nameof(SleepModeToolTip));
+	}
 
 	#region Customization
 
@@ -199,13 +205,13 @@ public class MonitorViewModel : ViewModelBase
 	{
 		var methods = new List<(SleepModeMethod Method, string Name, string Alias)>();
 
-		if (_monitor.IsPowerModeSupported)
+      if (Settings.EnablesSleepModeByDdcCi && _monitor.IsPowerModeSupported)
 			methods.Add(SleepModeMethodInfo[0]);
 
-		if (_monitor.IsBrightnessSupported)
+     if (Settings.EnablesSleepModeByBrightnessZero && _monitor.IsBrightnessSupported)
 			methods.Add(SleepModeMethodInfo[1]);
 
-		if (CanShowBlackOverlay())
+      if (Settings.EnablesSleepModeByBlackOverlay && CanShowBlackOverlay())
 			methods.Add(SleepModeMethodInfo[2]);
 
 		return methods.ToArray();
@@ -223,7 +229,7 @@ public class MonitorViewModel : ViewModelBase
 		if (methods.Length == 0)
 			return "The control is disabled";
 
-		return $"supported methods: {string.Join(", ", methods.Select(x => $"{x.Name} ({x.Alias})"))}";
+     return $"enabled methods: {string.Join(", ", methods.Select(x => $"{x.Name} ({x.Alias})"))}";
 	}
 
 	public bool UpdateBrightness(int value = -1)
