@@ -1,9 +1,12 @@
 ﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 
 using Monitorian.Core.Models;
 using Monitorian.Core.ViewModels;
@@ -199,4 +202,28 @@ public partial class MainWindow : Window
 	}
 
 	#endregion
+}
+
+internal sealed class MonitorBlackoutWindow : Window
+{
+	public MonitorBlackoutWindow(Rect monitorRect)
+	{
+		if (monitorRect.IsEmpty || (monitorRect.Width <= 0D) || (monitorRect.Height <= 0D))
+			throw new ArgumentException("The monitor rectangle must be valid.", nameof(monitorRect));
+
+		Left = monitorRect.Left;
+		Top = monitorRect.Top;
+		Width = monitorRect.Width;
+		Height = monitorRect.Height;
+		WindowStyle = WindowStyle.None;
+		ResizeMode = ResizeMode.NoResize;
+		ShowInTaskbar = false;
+		ShowActivated = false;
+		Topmost = true;
+		Background = Brushes.Black;
+		Content = new Border
+		{
+			Background = Brushes.Black
+		};
+	}
 }

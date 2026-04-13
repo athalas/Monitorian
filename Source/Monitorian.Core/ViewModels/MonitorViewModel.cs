@@ -1,4 +1,8 @@
 ﻿using System;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -6,12 +10,28 @@ using Monitorian.Core.Helper;
 using Monitorian.Core.Models;
 using Monitorian.Core.Models.Monitor;
 using Monitorian.Core.Properties;
+using Monitorian.Core.Views;
 
 namespace Monitorian.Core.ViewModels;
 
 public class MonitorViewModel : ViewModelBase
 {
- private const byte PowerModeCode = 0xD6;
+ private enum SleepModeMethod
+	{
+		None = 0,
+		DdcCi,
+		BrightnessZero,
+		BlackOverlay
+	}
+
+	private static readonly (SleepModeMethod Method, string Name, string Alias)[] SleepModeMethodInfo = new[]
+	{
+		(SleepModeMethod.DdcCi, "DDC/CI", "ddc"),
+		(SleepModeMethod.BrightnessZero, "brightness zero", "b0"),
+		(SleepModeMethod.BlackOverlay, "black overlay", "blk")
+	};
+
+	private const byte PowerModeCode = 0xD6;
 	private const int PowerModeOnValue = 1;
 	private const int PowerModeStandbyValue = 2;
 
@@ -56,7 +76,8 @@ public class MonitorViewModel : ViewModelBase
 	public Rect MonitorRect => _monitor.MonitorRect;
 	public ConnectionType Connection => _monitor.Connection;
 	public bool IsInternal => _monitor.IsInternal;
-	public bool IsSleepModeSupported => _monitor.IsPowerModeSupported;
+  public bool IsSleepModeSupported => 0 < GetSupportedSleepModeMethods().Length;
+	public string SleepModeToolTip => BuildSleepModeToolTip();
 
 	#region Customization
 
@@ -170,6 +191,40 @@ public class MonitorViewModel : ViewModelBase
 		}
 	}
 	private bool _isSleepModeEnabled;
+	private SleepModeMethod _sleepModeMethod;
+	private int _sleepModeBrightness = -1;
+	private MonitorBlackoutWindow _sleepOverlayWindow;
+
+	private (SleepModeMethod Method, string Name, string Alias)[] GetSupportedSleepModeMethods()
+	{
+		var methods = new List<(SleepModeMethod Method, string Name, string Alias)>();
+
+		if (_monitor.IsPowerModeSupported)
+			methods.Add(SleepModeMethodInfo[0]);
+
+		if (_monitor.IsBrightnessSupported)
+			methods.Add(SleepModeMethodInfo[1]);
+
+		if (CanShowBlackOverlay())
+			methods.Add(SleepModeMethodInfo[2]);
+
+		return methods.ToArray();
+	}
+
+	private bool CanShowBlackOverlay()
+	{
+		return (MonitorRect.Width > 0D)
+			&& (MonitorRect.Height > 0D);
+	}
+
+	private string BuildSleepModeToolTip()
+	{
+		var methods = GetSupportedSleepModeMethods();
+		if (methods.Length == 0)
+			return "The control is disabled";
+
+		return $"supported methods: {string.Join(", ", methods.Select(x => $"{x.Name} ({x.Alias})"))}";
+	}
 
 	public bool UpdateBrightness(int value = -1)
 	{
@@ -296,12 +351,96 @@ public class MonitorViewModel : ViewModelBase
 
 	private bool SetSleepMode(bool isEnabled)
 	{
-        AccessResult result;
-        SetProperty(ref _isSleepModeEnabled, isEnabled);
+        if (_isSleepModeEnabled == isEnabled)
+			return true;
 
+		return isEnabled
+			? TryEnableSleepMode()
+			: TryDisableSleepMode();
+	}
+
+	private bool TryEnableSleepMode()
+	{
+		if (TrySetPowerMode(PowerModeStandbyValue))
+		{
+			_sleepModeMethod = SleepModeMethod.DdcCi;
+			return SetProperty(ref _isSleepModeEnabled, true);
+		}
+
+		if (TrySetBrightnessZero())
+		{
+			_sleepModeMethod = SleepModeMethod.BrightnessZero;
+			return SetProperty(ref _isSleepModeEnabled, true);
+		}
+
+		if (TryShowBlackOverlay())
+		{
+			_sleepModeMethod = SleepModeMethod.BlackOverlay;
+			return SetProperty(ref _isSleepModeEnabled, true);
+		}
+
+		_sleepModeMethod = SleepModeMethod.None;
+		return false;
+	}
+
+	private bool TryDisableSleepMode()
+	{
+		var method = _sleepModeMethod;
+		_sleepModeMethod = SleepModeMethod.None;
+
+		var success = method switch
+		{
+			SleepModeMethod.DdcCi => TrySetPowerMode(PowerModeOnValue),
+			SleepModeMethod.BrightnessZero => TryRestoreBrightness(),
+           SleepModeMethod.BlackOverlay => TryHideBlackOverlay(),
+			_ => true
+		};
+
+		if (success)
+			return SetProperty(ref _isSleepModeEnabled, false);
+
+		_sleepModeMethod = method;
+		return SetProperty(ref _isSleepModeEnabled, true);
+	}
+
+	private bool TrySetPowerMode(int value)
+	{
+		AccessResult result;
 		lock (_lock)
 		{
-           (result, _) = _monitor.SetValue(PowerModeCode, isEnabled ? PowerModeStandbyValue : PowerModeOnValue);
+			(result, _) = _monitor.SetValue(PowerModeCode, value);
+		}
+
+		switch (result.Status)
+		{
+			case AccessStatus.Succeeded:
+                _sleepModeBrightness = -1;
+				return true;
+
+			default:
+				_controller.OnMonitorAccessFailed(result);
+
+				switch (result.Status)
+				{
+					case AccessStatus.DdcDataInvalid:
+					case AccessStatus.DdcMessageInvalid:
+					case AccessStatus.TransmissionFailed:
+					case AccessStatus.NoLongerExist:
+						_controller.OnMonitorsChangeFound();
+						break;
+				}
+				return false;
+		}
+	}
+
+	private bool TrySetBrightnessZero()
+	{
+		_sleepModeBrightness = GetCurrentBrightnessOrDefault();
+
+		AccessResult result;
+		lock (_lock)
+		{
+			result = _monitor.SetBrightness(0);
 		}
 
 		switch (result.Status)
@@ -321,9 +460,107 @@ public class MonitorViewModel : ViewModelBase
 						_controller.OnMonitorsChangeFound();
 						break;
 				}
-                SetProperty(ref _isSleepModeEnabled, !isEnabled);
 				return false;
 		}
+	}
+
+	private bool TryRestoreBrightness()
+	{
+		var brightness = (_sleepModeBrightness >= 0) ? _sleepModeBrightness : 100;
+
+		AccessResult result;
+		lock (_lock)
+		{
+			result = _monitor.SetBrightness(brightness);
+		}
+
+		switch (result.Status)
+		{
+			case AccessStatus.Succeeded:
+				return true;
+
+			default:
+				_controller.OnMonitorAccessFailed(result);
+
+				switch (result.Status)
+				{
+					case AccessStatus.DdcDataInvalid:
+					case AccessStatus.DdcMessageInvalid:
+					case AccessStatus.TransmissionFailed:
+					case AccessStatus.NoLongerExist:
+						_controller.OnMonitorsChangeFound();
+						break;
+				}
+				return false;
+		}
+	}
+
+	private bool TryShowBlackOverlay()
+	{
+		if (!CanShowBlackOverlay())
+			return false;
+
+		if (_sleepOverlayWindow is not null)
+			return true;
+
+		try
+		{
+			var window = new MonitorBlackoutWindow(MonitorRect);
+			window.Closed += OnSleepOverlayClosed;
+			_sleepOverlayWindow = window;
+			window.Show();
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine("Failed to show black overlay." + Environment.NewLine + ex);
+			return false;
+		}
+	}
+
+	private bool TryHideBlackOverlay()
+	{
+		if (_sleepOverlayWindow is null)
+			return true;
+
+		try
+		{
+			var window = _sleepOverlayWindow;
+			window.Closed -= OnSleepOverlayClosed;
+			window.Close();
+            window.Closed -= OnSleepOverlayClosed;
+			_sleepOverlayWindow = null;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine("Failed to close black overlay." + Environment.NewLine + ex);
+			return false;
+		}
+	}
+
+	private void OnSleepOverlayClosed(object sender, EventArgs e)
+	{
+		if (ReferenceEquals(sender, _sleepOverlayWindow))
+			_sleepOverlayWindow = null;
+	}
+
+	private int GetCurrentBrightnessOrDefault()
+	{
+		var brightness = _monitor.Brightness;
+		if (brightness >= 0)
+			return brightness;
+
+		AccessResult result;
+		lock (_lock)
+		{
+			result = _monitor.UpdateBrightness();
+			brightness = _monitor.Brightness;
+		}
+
+		return (result.Status is AccessStatus.Succeeded && (brightness >= 0))
+			? brightness
+			: 100;
 	}
 
 	#endregion
