@@ -774,7 +774,9 @@
 									Margin="2,0,8,0"
 									VerticalAlignment="Center"
 									IsEnabled="{Binding IsSleepModeSupported, Mode=OneWay}"
-									IsChecked="{Binding IsSleepModeEnabled, Mode=TwoWay}"/>
+                                 IsChecked="{Binding IsSleepModeEnabled, Mode=TwoWay}"
+									ToolTip="This control is disabled because this monitor doesn't support sleep."
+									ToolTipService.InitialShowDelay="0"/>
 						</Grid>
 
 						<!-- Identity -->
