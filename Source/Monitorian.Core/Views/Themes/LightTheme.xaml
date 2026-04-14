@@ -7,6 +7,7 @@
 	<Color x:Key="App.LineColor">#FF959595</Color>
 	<Color x:Key="App.TargetColor">#FF979797</Color>
 	<Color x:Key="App.OverlayColor">#48FFFFFF</Color>
+	<SolidColorBrush x:Key="App.OverlayBrush" Color="{DynamicResource App.OverlayColor}"/>
 
 	<SolidColorBrush x:Key="App.Foreground" Color="{DynamicResource App.ForegroundColor}"/>
 	<SolidColorBrush x:Key="App.Foreground.Shadow" Color="{DynamicResource App.ShadowColor}"/>

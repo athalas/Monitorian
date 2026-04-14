@@ -9,6 +9,7 @@
 	<Color x:Key="App.LineColor">#FF808080</Color>
 	<Color x:Key="App.TargetColor">LightGray</Color>
 	<Color x:Key="App.OverlayColor">#48000000</Color>
+	<SolidColorBrush x:Key="App.OverlayBrush" Color="{DynamicResource App.OverlayColor}"/>
 
 	<Color x:Key="App.Background.Accent.StaticColor">#FF2982CC</Color>
 	<Color x:Key="App.Background.Accent.MouseOverColor">#FF5CA4DE</Color>

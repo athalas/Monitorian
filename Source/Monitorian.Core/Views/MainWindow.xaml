@@ -601,13 +601,34 @@
 			<RowDefinition Height="Auto"/>
 		</Grid.RowDefinitions>
 
-		<!-- Pulse -->
-       <controls:PulseLabel Grid.Row="0"
-							 Margin="8,4"
-							 Style="{StaticResource PulseLabelStyle}"
-							 Content="{Binding Source={x:Static models:ProductInfo.Title}, Mode=OneTime}"
-							 IsPulsing="{Binding IsScanning, Mode=OneWay}"
-							 Visibility="{Binding IsMonitorsEmpty, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverterKey}}"/>
+        <!-- Header / drag handle -->
+		<Border Grid.Row="0"
+				Panel.ZIndex="10"
+				Height="28"
+				Background="{DynamicResource App.Background.Plain}"
+                    BorderBrush="{DynamicResource App.OverlayBrush}"
+				BorderThickness="0,0,0,1"
+				Cursor="SizeAll"
+				MouseLeftButtonDown="DragHandle_MouseLeftButtonDown">
+			<Grid Margin="8,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
+
+				<controls:PulseLabel Grid.Column="0"
+									 VerticalAlignment="Center"
+									 Style="{StaticResource PulseLabelStyle}"
+									 Content="{Binding Source={x:Static models:ProductInfo.Title}, Mode=OneTime}"
+									 IsPulsing="{Binding IsScanning, Mode=OneWay}"/>
+				<TextBlock Grid.Column="1"
+						   Margin="8,0,0,0"
+						   VerticalAlignment="Center"
+						   Foreground="{StaticResource App.Foreground}"
+						   Opacity="0.65"
+						   Text="Drag here to move the window"/>
+			</Grid>
+		</Border>
 
 		<!-- Monitors-->
       <ListView Grid.Row="1"

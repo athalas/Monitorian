@@ -151,6 +151,21 @@ public partial class MainWindow : Window
 		return CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
 	}
 
+	private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+	{
+		if (e.ButtonState != MouseButtonState.Pressed)
+			return;
+
+		try
+		{
+			DragMove();
+		}
+		catch (InvalidOperationException)
+		{
+			// Ignore cases where the window cannot be dragged yet.
+		}
+	}
+
 	private static bool IsGlobalSleepShortcut(uint virtualKey)
 	{
 		if (virtualKey != (uint)KeyInterop.VirtualKeyFromKey(MonitorSleepShortcut.HotkeyKey))
