@@ -175,7 +175,7 @@ public class SettingsCore : BindableBase
 	}
 	private bool _recordsOperationLog;
 
-	/// <summary>
+	/// <summary>	
 	/// Whether to enable DDC/CI for sleep mode
 	/// </summary>
 	[DataMember]
@@ -184,7 +184,6 @@ public class SettingsCore : BindableBase
         get => _enablesSleepModeByDdcCi ??= true;
 		set => SetProperty(ref _enablesSleepModeByDdcCi, value);
 	}
-   [DataMember(Name = nameof(EnablesSleepModeByDdcCi))]
 	private bool? _enablesSleepModeByDdcCi;
 
 	/// <summary>
@@ -196,7 +195,6 @@ public class SettingsCore : BindableBase
        get => _enablesSleepModeByBrightnessZero ??= true;
 		set => SetProperty(ref _enablesSleepModeByBrightnessZero, value);
 	}
-  [DataMember(Name = nameof(EnablesSleepModeByBrightnessZero))]
 	private bool? _enablesSleepModeByBrightnessZero;
 
 	/// <summary>
@@ -208,7 +206,6 @@ public class SettingsCore : BindableBase
      get => _enablesSleepModeByBlackOverlay ??= true;
 		set => SetProperty(ref _enablesSleepModeByBlackOverlay, value);
 	}
-    [DataMember(Name = nameof(EnablesSleepModeByBlackOverlay))]
 	private bool? _enablesSleepModeByBlackOverlay;
 
 	#endregion
