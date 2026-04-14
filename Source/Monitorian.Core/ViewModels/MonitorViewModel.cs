@@ -33,7 +33,7 @@ public class MonitorViewModel : ViewModelBase
 
 	private const byte PowerModeCode = 0xD6;
 	private const int PowerModeOnValue = 1;
-	private const int PowerModeStandbyValue = 2;
+ private static int[] PowerModeSleepValues => new[] { 4, 3, 2 };
 
 	private readonly AppControllerCore _controller;
 	public SettingsCore Settings => _controller.Settings;
@@ -367,7 +367,7 @@ public class MonitorViewModel : ViewModelBase
 
 	private bool TryEnableSleepMode()
 	{
-		if (TrySetPowerMode(PowerModeStandbyValue))
+     if (TrySetPowerMode(PowerModeSleepValues, allowFallback: true))
 		{
 			_sleepModeMethod = SleepModeMethod.DdcCi;
 			return SetProperty(ref _isSleepModeEnabled, true);
@@ -411,18 +411,32 @@ public class MonitorViewModel : ViewModelBase
 
 	private bool TrySetPowerMode(int value)
 	{
-		AccessResult result;
-		lock (_lock)
+        return TrySetPowerMode(new[] { value }, allowFallback: false);
+	}
+
+  private bool TrySetPowerMode(IEnumerable<int> preferredValues, bool allowFallback)
+	{
+        var values = GetSupportedPowerModeValues(preferredValues, allowFallback).ToArray();
+		if (values.Length == 0)
+			return false;
+
+		AccessResult result = AccessResult.NotSupported;
+		foreach (var value in values)
 		{
-			(result, _) = _monitor.SetValue(PowerModeCode, value);
+			lock (_lock)
+			{
+				(result, _) = _monitor.SetValue(PowerModeCode, value);
+			}
+
+			if (result.Status is AccessStatus.Succeeded)
+			{
+				_sleepModeBrightness = -1;
+				return true;
+			}
 		}
 
-		switch (result.Status)
+      switch (result.Status)
 		{
-			case AccessStatus.Succeeded:
-                _sleepModeBrightness = -1;
-				return true;
-
 			default:
 				_controller.OnMonitorAccessFailed(result);
 
@@ -437,6 +451,36 @@ public class MonitorViewModel : ViewModelBase
 				}
 				return false;
 		}
+	}
+
+  private IEnumerable<int> GetSupportedPowerModeValues(IEnumerable<int> preferredValues, bool allowFallback)
+	{
+		var values = preferredValues?.Distinct().ToArray() ?? Array.Empty<int>();
+
+        AccessResult result = default;
+		ValueData data = default;
+		lock (_lock)
+		{
+			(result, data) = _monitor.GetValue(PowerModeCode);
+		}
+
+		if ((result.Status is AccessStatus.Succeeded) && (data?.Values is { Count: > 0 }))
+		{
+			var supportedValues = data.Values.Select(x => (int)x).Distinct().ToArray();
+			var selectedValues = values.Where(supportedValues.Contains).ToArray();
+
+			if (selectedValues.Length > 0)
+				return selectedValues;
+
+           if (allowFallback)
+			{
+				var fallbackValues = supportedValues.Where(x => x is not PowerModeOnValue).ToArray();
+				if (fallbackValues.Length > 0)
+				return fallbackValues;
+           }
+		}
+
+		return values;
 	}
 
 	private bool TrySetBrightnessZero()
