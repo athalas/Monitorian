@@ -1,10 +1,12 @@
 ﻿using System;
+using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Data;
 
 using Monitorian.Core.Models;
+using Monitorian.Core.Views;
 
 namespace Monitorian.Core.ViewModels;
 
@@ -18,7 +20,11 @@ public class MainWindowViewModel : ViewModelBase
 		this._controller = controller ?? throw new ArgumentNullException(nameof(controller));
 		this._controller.ScanningChanged += OnScanningChanged;
 		Settings.PropertyChanged += OnSettingsChanged;
+       _controller.Monitors.CollectionChanged += OnMonitorsCollectionChanged;
+		HookMonitorSleepHandlers(_controller.Monitors);
 	}
+
+	public static string RestoreAllMonitorsShortcutText => MonitorSleepShortcut.DisplayText;
 
 	public ListCollectionView MonitorsView
 	{
@@ -44,6 +50,13 @@ public class MainWindowViewModel : ViewModelBase
 			return _monitorsView;
 		}
 	}
+
+	public void ToggleAllSleepMode()
+	{
+		IsAllSleepModeEnabled = !(IsAllSleepModeEnabled ?? false);
+	}
+
+	private void RefreshAllSleepModeState() => OnPropertyChanged(nameof(IsAllSleepModeEnabled));
 	private ListCollectionView _monitorsView;
 
 	private void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -73,10 +86,90 @@ public class MainWindowViewModel : ViewModelBase
 
 	public bool IsMonitorsEmpty => MonitorsView.IsEmpty;
 
+	public bool? IsAllSleepModeEnabled
+	{
+		get
+		{
+			var monitors = _controller.Monitors.ToArray();
+			if (monitors.Length == 0)
+				return false;
+
+			var enabledCount = monitors.Count(x => x.IsSleepModeEnabled);
+			return enabledCount switch
+			{
+				0 => false,
+				_ when enabledCount == monitors.Length => true,
+				_ => null
+			};
+		}
+		set
+		{
+			if (value is true)
+			{
+				_controller.SetAllMonitorsSleepMode(true);
+               RefreshAllSleepModeState();
+			}
+			else if (value is false)
+			{
+				_controller.RestoreAllMonitors();
+               RefreshAllSleepModeState();
+			}
+		}
+	}
+
 	private void OnScanningChanged(object sender, bool e)
 	{
 		IsScanning = e;
 		OnPropertyChanged(nameof(IsScanning));
+	}
+
+	private void OnMonitorsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+	{
+		switch (e.Action)
+		{
+			case NotifyCollectionChangedAction.Add:
+			case NotifyCollectionChangedAction.Replace:
+				HookMonitorSleepHandlers(e.NewItems.Cast<MonitorViewModel>());
+				if (e.OldItems is not null)
+					UnhookMonitorSleepHandlers(e.OldItems.Cast<MonitorViewModel>());
+				break;
+
+			case NotifyCollectionChangedAction.Remove:
+				if (e.OldItems is not null)
+					UnhookMonitorSleepHandlers(e.OldItems.Cast<MonitorViewModel>());
+				break;
+
+			case NotifyCollectionChangedAction.Reset:
+				UnhookMonitorSleepHandlers();
+				HookMonitorSleepHandlers(_controller.Monitors);
+				break;
+		}
+
+		OnPropertyChanged(nameof(IsAllSleepModeEnabled));
+	}
+
+	private void OnMonitorPropertyChanged(object sender, PropertyChangedEventArgs e)
+	{
+		if (e.PropertyName == nameof(MonitorViewModel.IsSleepModeEnabled))
+			OnPropertyChanged(nameof(IsAllSleepModeEnabled));
+	}
+
+	private void HookMonitorSleepHandlers(System.Collections.Generic.IEnumerable<MonitorViewModel> monitors)
+	{
+		foreach (var monitor in monitors)
+		{
+			monitor.PropertyChanged += OnMonitorPropertyChanged;
+		}
+	}
+
+	private void UnhookMonitorSleepHandlers(System.Collections.Generic.IEnumerable<MonitorViewModel> monitors = null)
+	{
+		monitors ??= _controller.Monitors;
+
+		foreach (var monitor in monitors)
+		{
+			monitor.PropertyChanged -= OnMonitorPropertyChanged;
+		}
 	}
 
 	public bool IsScanning { get; private set; }
@@ -113,5 +206,21 @@ public class MainWindowViewModel : ViewModelBase
 	{
 		var monitor = MonitorsView.Cast<MonitorViewModel>().FirstOrDefault(x => x.IsSelectedByKey);
 		monitor?.IsByKey = false;
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			_controller.ScanningChanged -= OnScanningChanged;
+			Settings.PropertyChanged -= OnSettingsChanged;
+			_controller.Monitors.CollectionChanged -= OnMonitorsCollectionChanged;
+			UnhookMonitorSleepHandlers();
+
+			if (_monitorsView is not null)
+				((INotifyCollectionChanged)_monitorsView).CollectionChanged -= OnCollectionChanged;
+		}
+
+		base.Dispose(disposing);
 	}
 }

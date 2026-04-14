@@ -158,6 +158,7 @@
     <Compile Include="Views\MenuWindow.xaml.cs">
       <DependentUpon>MenuWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\MonitorSleepShortcut.cs" />
     <Compile Include="Views\ScrollInput.cs" />
     <Compile Include="Views\ScrollWindow.xaml.cs">
       <DependentUpon>ScrollWindow.xaml</DependentUpon>

@@ -6,6 +6,7 @@
 		xmlns:models="clr-namespace:Monitorian.Core.Models"
 		xmlns:behaviors="clr-namespace:Monitorian.Core.Views.Behaviors"
 		xmlns:controls="clr-namespace:Monitorian.Core.Views.Controls"
+     xmlns:views="clr-namespace:Monitorian.Core.Views"
 		xmlns:properties="clr-namespace:Monitorian.Core.Properties"
 		Width="340" Height="200"
 		ResizeMode="NoResize" SizeToContent="WidthAndHeight"
@@ -594,15 +595,23 @@
 	</Window.Resources>
 
 	<Grid Width="340">
+      <Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+
 		<!-- Pulse -->
-		<controls:PulseLabel Margin="8,4"
+       <controls:PulseLabel Grid.Row="0"
+							 Margin="8,4"
 							 Style="{StaticResource PulseLabelStyle}"
 							 Content="{Binding Source={x:Static models:ProductInfo.Title}, Mode=OneTime}"
 							 IsPulsing="{Binding IsScanning, Mode=OneWay}"
 							 Visibility="{Binding IsMonitorsEmpty, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverterKey}}"/>
 
 		<!-- Monitors-->
-		<ListView ItemsSource="{Binding MonitorsView}"
+      <ListView Grid.Row="1"
+				  ItemsSource="{Binding MonitorsView}"
 				  SelectionMode="Single">
 			<ListView.Template>
 				<ControlTemplate TargetType="{x:Type ListView}">
@@ -839,5 +848,24 @@
 				<behaviors:ItemSelectorBehavior/>
 			</i:Interaction.Behaviors>
 		</ListView>
+
+		<StackPanel Grid.Row="2"
+					Margin="8,0,8,8"
+					Visibility="{Binding IsMonitorsEmpty, Mode=OneWay, Converter={StaticResource BooleanToVisibilityTurnConverterKey}, ConverterParameter=True}">
+			<CheckBox Margin="0,4,0,2"
+				  Content="Sleep all monitors"
+				  IsThreeState="True"
+				  IsChecked="{Binding IsAllSleepModeEnabled, Mode=TwoWay}"
+				  ToolTipService.InitialShowDelay="0"/>
+
+			<TextBlock Margin="18,0,0,0"
+					   TextWrapping="Wrap"
+					   Foreground="{StaticResource App.Foreground}"
+					   FontSize="10">
+				<Run Text="Restore the monitor image with "/>
+				<Run Text="{x:Static views:MonitorSleepShortcut.DisplayText}"/>
+				<Run Text="."/>
+			</TextBlock>
+		</StackPanel>
 	</Grid>
 </Window>

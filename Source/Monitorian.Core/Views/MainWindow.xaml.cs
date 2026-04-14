@@ -16,9 +16,7 @@ namespace Monitorian.Core.Views;
 
 public partial class MainWindow : Window
 {
-   private const int HotkeyId = 0x7248;
-	private const uint MOD_ALT = 0x0001;
-	private const uint MOD_CONTROL = 0x0002;
+ private const int HotkeyId = 0x7248;
 	private const uint WM_HOTKEY = 0x0312;
 
 	private readonly StickWindowMover _mover;
@@ -47,7 +45,7 @@ public partial class MainWindow : Window
 		_windowHandle = new WindowInteropHelper(this).EnsureHandle();
 		_hwndSource = HwndSource.FromHwnd(_windowHandle);
 		_hwndSource?.AddHook(WndProc);
-		RegisterHotKey(_windowHandle, HotkeyId, MOD_CONTROL | MOD_ALT, (uint)KeyInterop.VirtualKeyFromKey(Key.Home));
+       RegisterHotKey(_windowHandle, HotkeyId, MonitorSleepShortcut.Modifiers, (uint)KeyInterop.VirtualKeyFromKey(MonitorSleepShortcut.HotkeyKey));
 
       _mover = new StickWindowMover(this, _controller.NotifyIconContainer.NotifyIcon)
 		{
@@ -77,7 +75,7 @@ public partial class MainWindow : Window
 	{
 		if (msg == WM_HOTKEY && wParam.ToInt32() == HotkeyId)
 		{
-			_controller.RestoreAllMonitors();
+           ViewModel.ToggleAllSleepMode();
 			handled = true;
 		}
 

@@ -214,9 +214,14 @@ public class AppControllerCore
 
 	public void RestoreAllMonitors()
 	{
+     SetAllMonitorsSleepMode(false);
+	}
+
+	public void SetAllMonitorsSleepMode(bool isEnabled)
+	{
 		foreach (var monitor in Monitors.ToArray())
 		{
-			monitor.IsSleepModeEnabled = false;
+			monitor.IsSleepModeEnabled = isEnabled;
 		}
 	}
 
