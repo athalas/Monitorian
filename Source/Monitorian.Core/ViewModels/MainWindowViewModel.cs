@@ -56,7 +56,7 @@ public class MainWindowViewModel : ViewModelBase
 		IsAllSleepModeEnabled = !(IsAllSleepModeEnabled ?? false);
 	}
 
-	private void RefreshAllSleepModeState() => OnPropertyChanged(nameof(IsAllSleepModeEnabled));
+ private void RefreshAllSleepModeState() => OnPropertyChanged(nameof(IsAllSleepModeEnabled));
 	private ListCollectionView _monitorsView;
 
 	private void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)

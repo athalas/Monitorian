@@ -1,5 +1,6 @@
 ﻿using System;
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
@@ -16,13 +17,20 @@ namespace Monitorian.Core.Views;
 
 public partial class MainWindow : Window
 {
- private const int HotkeyId = 0x7248;
+   private const int HotkeyId = 0x7248;
 	private const uint WM_HOTKEY = 0x0312;
+	private const int WH_KEYBOARD_LL = 13;
+	private const int WM_KEYDOWN = 0x0100;
+	private const int WM_SYSKEYDOWN = 0x0104;
+	private const int VK_CONTROL = 0x11;
+	private const int VK_MENU = 0x12;
 
 	private readonly StickWindowMover _mover;
-  private readonly AppControllerCore _controller;
+   private readonly AppControllerCore _controller;
 	private readonly IntPtr _windowHandle;
 	private readonly HwndSource _hwndSource;
+  private readonly LowLevelKeyboardProc _keyboardProc;
+	private readonly IntPtr _keyboardHookHandle;
 	public MainWindowViewModel ViewModel => (MainWindowViewModel)this.DataContext;
 
 	[DllImport("user32.dll", SetLastError = true)]
@@ -33,27 +41,58 @@ public partial class MainWindow : Window
 	[return: MarshalAs(UnmanagedType.Bool)]
 	private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+	[DllImport("user32.dll")]
+	private static extern short GetAsyncKeyState(int vKey);
+
+	[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+	private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+	private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+	[StructLayout(LayoutKind.Sequential)]
+	private struct KBDLLHOOKSTRUCT
+	{
+		public uint vkCode;
+		public uint scanCode;
+		public uint flags;
+		public uint time;
+		public IntPtr dwExtraInfo;
+	}
+
 	public MainWindow(AppControllerCore controller)
 	{
-       _controller = controller ?? throw new ArgumentNullException(nameof(controller));
+     _controller = controller ?? throw new ArgumentNullException(nameof(controller));
 		LanguageService.Switch();
 
 		InitializeComponent();
 
-     this.DataContext = new MainWindowViewModel(_controller);
+       this.DataContext = new MainWindowViewModel(_controller);
 
 		_windowHandle = new WindowInteropHelper(this).EnsureHandle();
 		_hwndSource = HwndSource.FromHwnd(_windowHandle);
 		_hwndSource?.AddHook(WndProc);
-       RegisterHotKey(_windowHandle, HotkeyId, MonitorSleepShortcut.Modifiers, (uint)KeyInterop.VirtualKeyFromKey(MonitorSleepShortcut.HotkeyKey));
+     RegisterHotKey(_windowHandle, HotkeyId, MonitorSleepShortcut.Modifiers, (uint)KeyInterop.VirtualKeyFromKey(MonitorSleepShortcut.HotkeyKey));
 
-      _mover = new StickWindowMover(this, _controller.NotifyIconContainer.NotifyIcon)
+		_keyboardProc = KeyboardHookCallback;
+		_keyboardHookHandle = SetKeyboardHook(_keyboardProc);
+
+       _mover = new StickWindowMover(this, _controller.NotifyIconContainer.NotifyIcon)
 		{
 			KeepsDistance = true
 		};
 		_mover.ForegroundWindowChanged += OnDeactivated;
 
-     _controller.WindowPainter.Add(this);
+       _controller.WindowPainter.Add(this);
 		_controller.WindowPainter.ThemeChanged += (_, _) =>
 		{
 			ViewModel.MonitorsView.Refresh();
@@ -65,6 +104,9 @@ public partial class MainWindow : Window
 
 	protected override void OnClosed(EventArgs e)
 	{
+      if (_keyboardHookHandle != IntPtr.Zero)
+			UnhookWindowsHookEx(_keyboardHookHandle);
+
 		UnregisterHotKey(_windowHandle, HotkeyId);
 		_hwndSource?.RemoveHook(WndProc);
 
@@ -75,11 +117,51 @@ public partial class MainWindow : Window
 	{
 		if (msg == WM_HOTKEY && wParam.ToInt32() == HotkeyId)
 		{
-           ViewModel.ToggleAllSleepMode();
+          ViewModel.ToggleAllSleepMode();
 			handled = true;
 		}
 
 		return IntPtr.Zero;
+	}
+
+	private IntPtr SetKeyboardHook(LowLevelKeyboardProc proc)
+	{
+		using var process = Process.GetCurrentProcess();
+		using var module = process.MainModule;
+		var moduleHandle = GetModuleHandle(module?.ModuleName);
+
+		return SetWindowsHookEx(WH_KEYBOARD_LL, proc, moduleHandle, 0);
+	}
+
+	private IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+	{
+		if (nCode >= 0 && (wParam.ToInt32() is WM_KEYDOWN or WM_SYSKEYDOWN))
+		{
+			var keyData = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+			if (!IsGlobalSleepShortcut(keyData.vkCode))
+			{
+              Dispatcher.BeginInvoke(new Action(() =>
+				{
+					if (_controller.TryRestoreAllMonitorsOnAnyKey())
+                       ViewModel.IsAllSleepModeEnabled = false;
+				}));
+			}
+		}
+
+		return CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
+	}
+
+	private static bool IsGlobalSleepShortcut(uint virtualKey)
+	{
+		if (virtualKey != (uint)KeyInterop.VirtualKeyFromKey(MonitorSleepShortcut.HotkeyKey))
+			return false;
+
+		return IsKeyDown(VK_CONTROL) && IsKeyDown(VK_MENU);
+	}
+
+	private static bool IsKeyDown(int virtualKey)
+	{
+		return (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 	}
 
 	#region Show/Hide

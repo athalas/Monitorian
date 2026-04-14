@@ -217,6 +217,47 @@ public class AppControllerCore
      SetAllMonitorsSleepMode(false);
 	}
 
+	public bool TryRestoreAllMonitorsOnAnyKey()
+	{
+		if (!ShouldRestoreAllMonitorsOnAnyKey())
+			return false;
+
+		RestoreAllMonitors();
+		return true;
+	}
+
+	private bool ShouldRestoreAllMonitorsOnAnyKey()
+	{
+		var monitors = Monitors.ToArray();
+		if (monitors.Length == 0)
+			return false;
+
+		if (monitors.All(x => x.IsSleepModeEnabled))
+			return true;
+
+        var workArea = SystemParameters.WorkArea;
+		var gapWidth = SystemParameters.PrimaryScreenWidth - workArea.Width;
+		var gapHeight = SystemParameters.PrimaryScreenHeight - workArea.Height;
+
+		var taskbarRect = (workArea.X, workArea.Y, gapWidth, gapHeight) switch
+		{
+			( > 0, 0, > 0, 0) => new Rect(0, 0, gapWidth, workArea.Height),
+			(0, > 0, 0, > 0) => new Rect(0, 0, workArea.Width, gapHeight),
+			(0, 0, > 0, 0) => new Rect(workArea.Width, 0, gapWidth, workArea.Height),
+			(0, 0, 0, > 0) => new Rect(0, workArea.Height, workArea.Width, gapHeight),
+			_ => Rect.Empty
+		};
+
+		if (!taskbarRect.IsEmpty)
+		{
+			var taskbarMonitor = monitors.FirstOrDefault(x => x.MonitorRect.IntersectsWith(taskbarRect));
+			if (taskbarMonitor?.IsSleepModeEnabled == true)
+				return true;
+		}
+
+		return false;
+	}
+
 	public void SetAllMonitorsSleepMode(bool isEnabled)
 	{
 		foreach (var monitor in Monitors.ToArray())
