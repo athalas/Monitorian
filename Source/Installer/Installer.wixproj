@@ -2,14 +2,14 @@
   <PropertyGroup>
     <OutputName>Monitorian.Installer</OutputName>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DefineConstants>Debug</DefineConstants>
     <SuppressValidation>False</SuppressValidation>
-    <SuppressIces>ICE69</SuppressIces>
+    <SuppressIces>ICE38;ICE43;ICE57;ICE69</SuppressIces>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <SuppressValidation>False</SuppressValidation>
-    <SuppressIces>ICE69</SuppressIces>
+    <SuppressIces>ICE38;ICE43;ICE57;ICE69</SuppressIces>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Monitorian\Monitorian.csproj">
