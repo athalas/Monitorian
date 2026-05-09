@@ -26,6 +26,12 @@ internal class RelayCommand : System.Windows.Input.ICommand
 		_canExecute = _ => canExecute?.Invoke() ?? true;
 	}
 
+	private string AskForProfileName()
+	{
+		var dlg = new Monitorian.Core.Views.InputDialog("Enter profile name", "Profile name:");
+		return (dlg.ShowDialog() is true) ? dlg.ResponseText : null;
+	}
+
 	public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
 	{
 		_execute = execute ?? throw new ArgumentNullException(nameof(execute));
@@ -117,13 +123,12 @@ public class MainWindowViewModel : ViewModelBase
 	private void SaveProfile()
 	{
         // Prompt for name if none selected
-		var name = SelectedProfileName;
+     var name = SelectedProfileName;
 		if (string.IsNullOrWhiteSpace(name))
 		{
-            var prompt = new Views.InputDialog("Enter profile name", "Profile name:");
-			if (prompt.ShowDialog() is not true)
+			name = AskForProfileName();
+			if (string.IsNullOrWhiteSpace(name))
 				return;
-			name = prompt.ResponseText;
 		}
 
 		if (string.IsNullOrWhiteSpace(name))
