@@ -33,6 +33,8 @@
 								Background="{TemplateBinding Background}">
 							<ContentPresenter Margin="{TemplateBinding Padding}"/>
 						</Border>
+
+
 					</ControlTemplate>
 				</Setter.Value>
 			</Setter>
@@ -597,6 +599,7 @@
 	<Grid Width="340">
       <Grid.RowDefinitions>
 			<RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
 			<RowDefinition Height="Auto"/>
 			<RowDefinition Height="Auto"/>
 		</Grid.RowDefinitions>
@@ -629,6 +632,20 @@
 						   Text="Drag here to move the window"/>
 			</Grid>
 		</Border>
+
+		<!-- Brightness profiles -->
+		<Grid Grid.Row="1" Margin="8,6,8,6">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
+			<ComboBox Grid.Column="0" ItemsSource="{Binding ProfileNames}" SelectedItem="{Binding SelectedProfileName}" IsEditable="False"/>
+			<Button Grid.Column="1" Margin="6,0,0,0" Width="56" Height="24" Content="Load" Command="{Binding LoadProfileCommand}" ToolTip="Load profile"/>
+			<Button Grid.Column="2" Margin="6,0,0,0" Width="56" Height="24" Content="Save" Command="{Binding SaveProfileCommand}" ToolTip="Save profile"/>
+			<Button Grid.Column="3" Margin="6,0,0,0" Width="56" Height="24" Content="Delete" Command="{Binding DeleteProfileCommand}" ToolTip="Delete profile"/>
+		</Grid>
 
 		<!-- Monitors-->
       <ListView Grid.Row="1"

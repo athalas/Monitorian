@@ -7,6 +7,10 @@ using System.Windows.Data;
 
 using Monitorian.Core.Models;
 using Monitorian.Core.Views;
+using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Windows;
+using System.Windows.Input;
 
 namespace Monitorian.Core.ViewModels;
 
@@ -21,7 +25,116 @@ public class MainWindowViewModel : ViewModelBase
 		this._controller.ScanningChanged += OnScanningChanged;
 		Settings.PropertyChanged += OnSettingsChanged;
        _controller.Monitors.CollectionChanged += OnMonitorsCollectionChanged;
-		HookMonitorSleepHandlers(_controller.Monitors);
+     HookMonitorSleepHandlers(_controller.Monitors);
+
+		// Initialize profile names from settings
+		RefreshProfileNames();
+
+		// Refresh when settings change profiles
+		Settings.BrightnessProfiles.CollectionChanged += (_, _) => RefreshProfileNames();
+	}
+
+	public ObservableCollection<string> ProfileNames { get; } = new();
+
+	private string _selectedProfileName;
+	public string SelectedProfileName
+	{
+		get => _selectedProfileName;
+        set
+		{
+			if (SetProperty(ref _selectedProfileName, value))
+			{
+				_loadProfileCommand?.RaiseCanExecuteChanged();
+				_deleteProfileCommand?.RaiseCanExecuteChanged();
+			}
+		}
+	}
+
+	public ICommand LoadProfileCommand => _loadProfileCommand ??= new RelayCommand(LoadProfile, () => !string.IsNullOrWhiteSpace(SelectedProfileName));
+	private RelayCommand _loadProfileCommand;
+
+	public ICommand SaveProfileCommand => _saveProfileCommand ??= new RelayCommand(SaveProfile, () => true);
+	private RelayCommand _saveProfileCommand;
+
+	public ICommand DeleteProfileCommand => _deleteProfileCommand ??= new RelayCommand(DeleteProfile, () => !string.IsNullOrWhiteSpace(SelectedProfileName));
+	private RelayCommand _deleteProfileCommand;
+
+	private void RefreshProfileNames()
+	{
+		ProfileNames.Clear();
+		foreach (var kv in Settings.BrightnessProfiles)
+		{
+			ProfileNames.Add(kv.Key);
+		}
+	}
+
+	private void LoadProfile()
+	{
+		if (string.IsNullOrWhiteSpace(SelectedProfileName))
+			return;
+
+		if (!Settings.BrightnessProfiles.TryGetValue(SelectedProfileName, out var profile))
+			return;
+
+		// Apply profile values to monitors
+		foreach (var kv in profile.Values)
+		{
+			var monitor = _controller.Monitors.FirstOrDefault(x => string.Equals(x.DeviceInstanceId, kv.Key, StringComparison.OrdinalIgnoreCase));
+			if (monitor is not null)
+			{
+				// Clamp and set brightness
+				int b = Math.Max(0, Math.Min(100, kv.Value));
+				monitor.SetBrightness(b);
+			}
+		}
+	}
+
+	private void SaveProfile()
+	{
+		// Prompt for name if none selected
+		var name = SelectedProfileName;
+		if (string.IsNullOrWhiteSpace(name))
+		{
+			var prompt = new Views.InputDialog("Enter profile name", "Profile name:");
+			if (prompt.ShowDialog() is not true)
+				return;
+			name = prompt.ResponseText;
+		}
+
+		if (string.IsNullOrWhiteSpace(name))
+			return;
+
+		// If exists, confirm overwrite
+		if (Settings.BrightnessProfiles.ContainsKey(name))
+		{
+			var result = MessageBox.Show($"Profile '{name}' already exists. Overwrite?", "Confirm overwrite", MessageBoxButton.YesNo, MessageBoxImage.Question);
+			if (result != MessageBoxResult.Yes)
+				return;
+		}
+
+		var values = new Dictionary<string, int>();
+		foreach (var m in _controller.Monitors)
+			values[m.DeviceInstanceId] = m.Brightness;
+
+		var profile = new BrightnessProfile(name, values);
+		Settings.BrightnessProfiles.Add(name, profile);
+		RefreshProfileNames();
+		SelectedProfileName = name;
+	}
+
+	private void DeleteProfile()
+	{
+		var name = SelectedProfileName;
+		if (string.IsNullOrWhiteSpace(name))
+			return;
+
+		var result = MessageBox.Show($"Delete profile '{name}'?", "Confirm delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+		if (result != MessageBoxResult.Yes)
+			return;
+
+		Settings.BrightnessProfiles.Remove(name);
+		RefreshProfileNames();
+		SelectedProfileName = null;
 	}
 
 	public static string RestoreAllMonitorsShortcutText => MonitorSleepShortcut.DisplayText;

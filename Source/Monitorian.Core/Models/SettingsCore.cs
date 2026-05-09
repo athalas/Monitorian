@@ -154,6 +154,17 @@ public class SettingsCore : BindableBase
 	private ObservableKeyedList<string, MonitorCustomizationItem> _monitorCustomizations;
 
 	/// <summary>
+	/// Brightness profiles saved by user
+	/// </summary>
+	[DataMember]
+	public ObservableKeyedList<string, BrightnessProfile> BrightnessProfiles
+	{
+		get => _brightnessProfiles ??= new ObservableKeyedList<string, BrightnessProfile>();
+		protected set => _brightnessProfiles = value;
+	}
+	private ObservableKeyedList<string, BrightnessProfile> _brightnessProfiles;
+
+	/// <summary>
 	/// Device Instance ID of selected monitor
 	/// </summary>
 	[DataMember]
@@ -225,8 +236,11 @@ public class SettingsCore : BindableBase
 	}
 	private string _fileName = SettingsFileName;
 
-	public SettingsCore()
-	{ }
+    public SettingsCore()
+	{
+		// Ensure BrightnessProfile type is known for DataContractSerializer
+		KnownTypes = new[] { typeof(BrightnessProfile) };
+	}
 
 	private Throttle _save;
 
