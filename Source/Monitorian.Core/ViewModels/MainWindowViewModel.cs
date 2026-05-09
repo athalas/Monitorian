@@ -1,49 +1,18 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 
 using Monitorian.Core.Models;
 using Monitorian.Core.Views;
-using System.Collections.ObjectModel;
-using System.Collections.Generic;
-using System.Windows;
-using System.Windows.Input;
 
 namespace Monitorian.Core.ViewModels;
-
-internal class RelayCommand : System.Windows.Input.ICommand
-{
-	private readonly Action<object> _execute;
-	private readonly Func<object, bool> _canExecute;
-
-	public event EventHandler CanExecuteChanged;
-
-	public RelayCommand(Action execute, Func<bool> canExecute = null)
-	{
-		_execute = _ => execute();
-		_canExecute = _ => canExecute?.Invoke() ?? true;
-	}
-
-	private string AskForProfileName()
-	{
-		var dlg = new Monitorian.Core.Views.InputDialog("Enter profile name", "Profile name:");
-		return (dlg.ShowDialog() is true) ? dlg.ResponseText : null;
-	}
-
-	public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
-	{
-		_execute = execute ?? throw new ArgumentNullException(nameof(execute));
-		_canExecute = canExecute ?? (_ => true);
-	}
-
-	public bool CanExecute(object parameter) => _canExecute(parameter);
-
-	public void Execute(object parameter) => _execute(parameter);
-
-	public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-}
 
 public class MainWindowViewModel : ViewModelBase
 {
@@ -52,26 +21,24 @@ public class MainWindowViewModel : ViewModelBase
 
 	public MainWindowViewModel(AppControllerCore controller)
 	{
-		this._controller = controller ?? throw new ArgumentNullException(nameof(controller));
-		this._controller.ScanningChanged += OnScanningChanged;
+		_controller = controller ?? throw new ArgumentNullException(nameof(controller));
+		_controller.ScanningChanged += OnScanningChanged;
 		Settings.PropertyChanged += OnSettingsChanged;
-       _controller.Monitors.CollectionChanged += OnMonitorsCollectionChanged;
-     HookMonitorSleepHandlers(_controller.Monitors);
+		_controller.Monitors.CollectionChanged += OnMonitorsCollectionChanged;
+		HookMonitorSleepHandlers(_controller.Monitors);
 
-		// Initialize profile names from settings
 		RefreshProfileNames();
-
-		// Refresh when settings change profiles
 		Settings.BrightnessProfiles.CollectionChanged += (_, _) => RefreshProfileNames();
 	}
 
 	public ObservableCollection<string> ProfileNames { get; } = new();
+	public bool HasProfiles => ProfileNames.Count > 0;
 
 	private string _selectedProfileName;
 	public string SelectedProfileName
 	{
 		get => _selectedProfileName;
-        set
+		set
 		{
 			if (SetProperty(ref _selectedProfileName, value))
 			{
@@ -87,6 +54,9 @@ public class MainWindowViewModel : ViewModelBase
 	public ICommand SaveProfileCommand => _saveProfileCommand ??= new RelayCommand(SaveProfile, () => true);
 	private RelayCommand _saveProfileCommand;
 
+	public ICommand NewProfileCommand => _newProfileCommand ??= new RelayCommand(CreateNewProfile, () => true);
+	private RelayCommand _newProfileCommand;
+
 	public ICommand DeleteProfileCommand => _deleteProfileCommand ??= new RelayCommand(DeleteProfile, () => !string.IsNullOrWhiteSpace(SelectedProfileName));
 	private RelayCommand _deleteProfileCommand;
 
@@ -94,9 +64,10 @@ public class MainWindowViewModel : ViewModelBase
 	{
 		ProfileNames.Clear();
 		foreach (var kv in Settings.BrightnessProfiles)
-		{
 			ProfileNames.Add(kv.Key);
-		}
+       OnPropertyChanged(nameof(HasProfiles));
+		_loadProfileCommand?.RaiseCanExecuteChanged();
+		_deleteProfileCommand?.RaiseCanExecuteChanged();
 	}
 
 	private void LoadProfile()
@@ -107,23 +78,20 @@ public class MainWindowViewModel : ViewModelBase
 		if (!Settings.BrightnessProfiles.TryGetValue(SelectedProfileName, out var profile))
 			return;
 
-		// Apply profile values to monitors
 		foreach (var kv in profile.Values)
 		{
 			var monitor = _controller.Monitors.FirstOrDefault(x => string.Equals(x.DeviceInstanceId, kv.Key, StringComparison.OrdinalIgnoreCase));
 			if (monitor is not null)
 			{
-				// Clamp and set brightness
-				int b = Math.Max(0, Math.Min(100, kv.Value));
-				monitor.SetBrightness(b);
+				var brightness = Math.Max(0, Math.Min(100, kv.Value));
+				monitor.SetBrightness(brightness);
 			}
 		}
 	}
 
 	private void SaveProfile()
 	{
-        // Prompt for name if none selected
-     var name = SelectedProfileName;
+		var name = SelectedProfileName;
 		if (string.IsNullOrWhiteSpace(name))
 		{
 			name = AskForProfileName();
@@ -131,10 +99,21 @@ public class MainWindowViewModel : ViewModelBase
 				return;
 		}
 
+		SaveProfile(name);
+	}
+
+	private void CreateNewProfile()
+	{
+		var name = AskForProfileName();
 		if (string.IsNullOrWhiteSpace(name))
 			return;
 
-		// If exists, confirm overwrite
+		SaveProfile(name);
+	}
+
+	private void SaveProfile(string name)
+	{
+
 		if (Settings.BrightnessProfiles.ContainsKey(name))
 		{
 			var result = MessageBox.Show($"Profile '{name}' already exists. Overwrite?", "Confirm overwrite", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -143,11 +122,10 @@ public class MainWindowViewModel : ViewModelBase
 		}
 
 		var values = new Dictionary<string, int>();
-		foreach (var m in _controller.Monitors)
-			values[m.DeviceInstanceId] = m.Brightness;
+		foreach (var monitor in _controller.Monitors)
+			values[monitor.DeviceInstanceId] = monitor.Brightness;
 
-		var profile = new BrightnessProfile(name, values);
-		Settings.BrightnessProfiles.Add(name, profile);
+		Settings.BrightnessProfiles.Add(name, new BrightnessProfile(name, values));
 		RefreshProfileNames();
 		SelectedProfileName = name;
 	}
@@ -167,7 +145,13 @@ public class MainWindowViewModel : ViewModelBase
 		SelectedProfileName = null;
 	}
 
-	public static string RestoreAllMonitorsShortcutText => MonitorSleepShortcut.DisplayText;
+	private string AskForProfileName()
+	{
+      var dialog = new ProfileNameDialog("Enter profile name", "Profile name:");
+		return dialog.ShowDialog() is true ? dialog.ResponseText : null;
+	}
+
+    public static string RestoreAllMonitorsShortcutText => Monitorian.Core.Views.MonitorSleepShortcut.DisplayText;
 
 	public ListCollectionView MonitorsView
 	{
@@ -194,34 +178,23 @@ public class MainWindowViewModel : ViewModelBase
 		}
 	}
 
-	public void ToggleAllSleepMode()
-	{
-		IsAllSleepModeEnabled = !(IsAllSleepModeEnabled ?? false);
-	}
+	public void ToggleAllSleepMode() => IsAllSleepModeEnabled = !(IsAllSleepModeEnabled ?? false);
 
- private void RefreshAllSleepModeState() => OnPropertyChanged(nameof(IsAllSleepModeEnabled));
+	private void RefreshAllSleepModeState() => OnPropertyChanged(nameof(IsAllSleepModeEnabled));
 	private ListCollectionView _monitorsView;
 
 	private void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
 	{
 		switch (e.Action)
 		{
-			//case NotifyCollectionChangedAction.Reset:
 			case NotifyCollectionChangedAction.Add:
 			case NotifyCollectionChangedAction.Remove:
 				OnPropertyChanged(nameof(IsMonitorsEmpty));
 
-				if (MonitorsView.CurrentItem is null)
+				if (MonitorsView.CurrentItem is null && !MonitorsView.Cast<MonitorViewModel>().Any(x => x.IsSelected))
 				{
-					// CollectionView.CurrentItem is automatically synchronized with SelectedItem
-					// when the target is an ItemsControl. However, this synchronization is not
-					// always fast enough to check if any item is currently selected.
-					if (!MonitorsView.Cast<MonitorViewModel>().Any(x => x.IsSelected))
-					{
-						var monitor = MonitorsView.Cast<MonitorViewModel>()
-							.FirstOrDefault(x => ReferenceEquals(x, _controller.SelectedMonitor));
-						monitor?.IsSelected = true;
-					}
+					var monitor = MonitorsView.Cast<MonitorViewModel>().FirstOrDefault(x => ReferenceEquals(x, _controller.SelectedMonitor));
+					monitor?.IsSelected = true;
 				}
 				break;
 		}
@@ -250,12 +223,12 @@ public class MainWindowViewModel : ViewModelBase
 			if (value is true)
 			{
 				_controller.SetAllMonitorsSleepMode(true);
-               RefreshAllSleepModeState();
+				RefreshAllSleepModeState();
 			}
 			else if (value is false)
 			{
 				_controller.RestoreAllMonitors();
-               RefreshAllSleepModeState();
+				RefreshAllSleepModeState();
 			}
 		}
 	}
@@ -297,22 +270,18 @@ public class MainWindowViewModel : ViewModelBase
 			OnPropertyChanged(nameof(IsAllSleepModeEnabled));
 	}
 
-	private void HookMonitorSleepHandlers(System.Collections.Generic.IEnumerable<MonitorViewModel> monitors)
+	private void HookMonitorSleepHandlers(IEnumerable<MonitorViewModel> monitors)
 	{
 		foreach (var monitor in monitors)
-		{
 			monitor.PropertyChanged += OnMonitorPropertyChanged;
-		}
 	}
 
-	private void UnhookMonitorSleepHandlers(System.Collections.Generic.IEnumerable<MonitorViewModel> monitors = null)
+	private void UnhookMonitorSleepHandlers(IEnumerable<MonitorViewModel> monitors = null)
 	{
 		monitors ??= _controller.Monitors;
 
 		foreach (var monitor in monitors)
-		{
 			monitor.PropertyChanged -= OnMonitorPropertyChanged;
-		}
 	}
 
 	public bool IsScanning { get; private set; }
@@ -365,5 +334,43 @@ public class MainWindowViewModel : ViewModelBase
 		}
 
 		base.Dispose(disposing);
+	}
+
+	private sealed class ProfileNameDialog : Window
+	{
+		private readonly TextBox _textBox;
+		public string ResponseText => _textBox.Text;
+
+		public ProfileNameDialog(string title, string prompt)
+		{
+			Title = title;
+			Width = 360;
+			Height = 140;
+			WindowStartupLocation = WindowStartupLocation.CenterOwner;
+			ResizeMode = ResizeMode.NoResize;
+			WindowStyle = WindowStyle.ToolWindow;
+
+			var grid = new Grid { Margin = new Thickness(8) };
+			grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+			grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+			grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+			grid.Children.Add(new TextBlock { Text = prompt });
+
+			_textBox = new TextBox { Margin = new Thickness(0, 8, 0, 8) };
+			Grid.SetRow(_textBox, 1);
+			grid.Children.Add(_textBox);
+
+			var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+			Grid.SetRow(buttons, 2);
+			var ok = new Button { Width = 80, Margin = new Thickness(4, 0, 4, 0), IsDefault = true, Content = "OK" };
+			ok.Click += (_, __) => { DialogResult = true; Close(); };
+			var cancel = new Button { Width = 80, Margin = new Thickness(4, 0, 4, 0), IsCancel = true, Content = "Cancel" };
+			buttons.Children.Add(ok);
+			buttons.Children.Add(cancel);
+			grid.Children.Add(buttons);
+
+			Content = grid;
+		}
 	}
 }

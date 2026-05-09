@@ -61,7 +61,7 @@ Additional languages:
    ```
 
  * Other:<br>
-:floppy_disk: [Installer](https://github.com/emoacht/Monitorian/releases/download/4.14.0-Installer/MonitorianInstaller3140.zip)
+:floppy_disk: [Installer](https://github.com/emoacht/Monitorian/releases/download/4.15.0-Installer/MonitorianInstaller4150.zip)
 
 ## Install/Uninstall
 
@@ -73,6 +73,7 @@ msiexec /a [source msi file path] targetdir=[destination folder path (absolute p
 
 In such case, please note the following:
 
+  - The installer is per-machine, so it can be installed for all users. Administrator privileges are required.
  - The settings file (and other file) will be created at: `[system drive]\Users\[user name]\AppData\Local\Monitorian\`
  - When you check [Start on sign in], a registry value will be added to: `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
 
@@ -232,6 +233,10 @@ An alternative language can be shown by adding a Resources (.resx) file into `/S
  - VESA [Monitor Control Command Set (MCCS)](https://www.google.co.jp/search?q=VESA+Monitor+Control+Command+Set+Standard+MCCS) standard
 
 ## History
+
+Ver 4.15 2026-5-9
+
+ - Add brightness profiles
 
 Ver 4.14 2026-3-22
 

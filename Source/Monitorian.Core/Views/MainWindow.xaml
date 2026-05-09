@@ -548,10 +548,18 @@
 									</VisualState>
 									<VisualState x:Name="Disabled">
 										<Storyboard>
+                         <ColorAnimation Storyboard.TargetName="StrokeIcon"
+											Storyboard.TargetProperty="(Shape.Stroke).(SolidColorBrush.Color)"
+											Duration="0"
+											To="#FF9E9E9E"/>
+							<ColorAnimation Storyboard.TargetName="FillIcon"
+											Storyboard.TargetProperty="(Shape.Fill).(SolidColorBrush.Color)"
+											Duration="0"
+											To="#FF9E9E9E"/>
 											<DoubleAnimation Storyboard.TargetName="border"
 															 Storyboard.TargetProperty="Opacity"
 															 Duration="0"
-															 To="0"/>
+                                             To="0.65"/>
 										</Storyboard>
 									</VisualState>
 								</VisualStateGroup>
@@ -594,6 +602,38 @@
 			<Setter Property="Foreground" Value="{StaticResource App.Foreground}"/>
 			<Setter Property="FontFamily" Value="Segoe UI"/>
 		</Style>
+
+		<!-- Brightness profile controls -->
+		<Style x:Key="ProfileActionButtonStyle" TargetType="{x:Type controls:IconButton}" BasedOn="{StaticResource IconButtonStyle}">
+			<Setter Property="Width" Value="26"/>
+			<Setter Property="Height" Value="26"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Margin" Value="0"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+
+		<Style x:Key="ProfileLoadButtonStyle" TargetType="{x:Type controls:IconButton}" BasedOn="{StaticResource ProfileActionButtonStyle}">
+			<Setter Property="Foreground" Value="#FF0078D7"/>
+         <Setter Property="StrokeIconData" Value="M 1,1 L 1,14 15,14 15,4 12,1 Z M 4,1 L 4,6 10,6 10,1 Z M 4,9 L 4,13 11,13 11,9 Z"/>
+			<Setter Property="FillIconData" Value="M 1,1 L 1,14 15,14 15,4 12,1 Z M 4,1 L 4,6 10,6 10,1 Z M 4,9 L 4,13 11,13 11,9 Z"/>
+		</Style>
+
+		<Style x:Key="ProfileSaveButtonStyle" TargetType="{x:Type controls:IconButton}" BasedOn="{StaticResource ProfileActionButtonStyle}">
+			<Setter Property="Foreground" Value="#FFC87A00"/>
+         <Setter Property="StrokeIconData" Value="M 1,1 L 1,14 15,14 15,4 12,1 Z M 4,1 L 4,6 10,6 10,1 Z M 4,9 L 4,13 11,13 11,9 Z"/>
+			<Setter Property="FillIconData" Value="M 1,1 L 1,14 15,14 15,4 12,1 Z M 4,1 L 4,6 10,6 10,1 Z M 4,9 L 4,13 11,13 11,9 Z"/>
+		</Style>
+
+		<Style x:Key="ProfileNewButtonStyle" TargetType="{x:Type controls:IconButton}" BasedOn="{StaticResource ProfileActionButtonStyle}">
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="StrokeIconData" Value="M 1,5 L 1,14 15,14 15,5 9,5 7,3 1,3 Z"/>
+			<Setter Property="FillIconData" Value="M 1,5 L 1,14 15,14 15,5 9,5 7,3 1,3 Z"/>
+		</Style>
+
+		<Style x:Key="ProfileDeleteButtonStyle" TargetType="{x:Type controls:IconButton}" BasedOn="{StaticResource ProfileActionButtonStyle}">
+			<Setter Property="Foreground" Value="#FFD13438"/>
+			<Setter Property="StrokeIconData" Value="M 2,2 L 10,10 M 10,2 L 2,10"/>
+		</Style>
 	</Window.Resources>
 
 	<Grid Width="340">
@@ -633,22 +673,60 @@
 			</Grid>
 		</Border>
 
-		<!-- Brightness profiles -->
-		<Grid Grid.Row="1" Margin="8,6,8,6">
+        <!-- Brightness profiles -->
+		<Grid Grid.Row="1" Margin="8,14,8,8">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+			</Grid.RowDefinitions>
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="*"/>
 				<ColumnDefinition Width="Auto"/>
 				<ColumnDefinition Width="Auto"/>
 				<ColumnDefinition Width="Auto"/>
+               <ColumnDefinition Width="Auto"/>
 			</Grid.ColumnDefinitions>
-			<ComboBox Grid.Column="0" ItemsSource="{Binding ProfileNames}" SelectedItem="{Binding SelectedProfileName}" IsEditable="False"/>
-			<Button Grid.Column="1" Margin="6,0,0,0" Width="56" Height="24" Content="Load" Command="{Binding LoadProfileCommand}" ToolTip="Load profile"/>
-			<Button Grid.Column="2" Margin="6,0,0,0" Width="56" Height="24" Content="Save" Command="{Binding SaveProfileCommand}" ToolTip="Save profile"/>
-			<Button Grid.Column="3" Margin="6,0,0,0" Width="56" Height="24" Content="Delete" Command="{Binding DeleteProfileCommand}" ToolTip="Delete profile"/>
+           <Label Grid.Row="0" Grid.Column="0"
+				   Margin="0,0,0,4"
+				   Padding="0"
+				   Content="Profiles"
+				   Foreground="{StaticResource App.Foreground}"
+				   VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="0"
+                    Grid.Row="1"
+					  MinWidth="0"
+					  Height="26"
+					  Margin="0"
+					  VerticalContentAlignment="Center"
+					  ItemsSource="{Binding ProfileNames}"
+					  SelectedItem="{Binding SelectedProfileName}"
+					  IsEditable="False"
+               IsEnabled="{Binding HasProfiles}"
+					  ToolTip="Select a saved brightness profile"/>
+            <controls:IconButton Grid.Row="1" Grid.Column="1"
+							   Margin="8,0,0,0"
+							   Style="{StaticResource ProfileNewButtonStyle}"
+							   Command="{Binding NewProfileCommand}"
+							   ToolTip="New Brightness Profile..."/>
+            <controls:IconButton Grid.Row="1" Grid.Column="2"
+							   Margin="8,0,0,0"
+							   Style="{StaticResource ProfileLoadButtonStyle}"
+							   Command="{Binding LoadProfileCommand}"
+							   ToolTip="Load selected profile"/>
+            <controls:IconButton Grid.Row="1" Grid.Column="3"
+							   Margin="6,0,0,0"
+							   Style="{StaticResource ProfileSaveButtonStyle}"
+							   Command="{Binding SaveProfileCommand}"
+							   ToolTip="Save current brightness as profile"/>
+            <controls:IconButton Grid.Row="1" Grid.Column="4"
+							   Margin="6,0,0,0"
+							   Style="{StaticResource ProfileDeleteButtonStyle}"
+							   Command="{Binding DeleteProfileCommand}"
+							   ToolTip="Delete selected profile"/>
 		</Grid>
 
 		<!-- Monitors-->
-      <ListView Grid.Row="1"
+          <ListView Grid.Row="2"
 				  ItemsSource="{Binding MonitorsView}"
 				  SelectionMode="Single">
 			<ListView.Template>
@@ -887,7 +965,7 @@
 			</i:Interaction.Behaviors>
 		</ListView>
 
-		<StackPanel Grid.Row="2"
+        <StackPanel Grid.Row="3"
 					Margin="8,0,8,8"
 					Visibility="{Binding IsMonitorsEmpty, Mode=OneWay, Converter={StaticResource BooleanToVisibilityTurnConverterKey}, ConverterParameter=True}">
 			<CheckBox Margin="0,4,0,2"

@@ -1,8 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text;
 
 using Monitorian.Core.Collections;
 using Monitorian.Core.Common;
@@ -158,7 +162,6 @@ public class SettingsCore : BindableBase
 	/// <summary>
 	/// Brightness profiles saved by user
 	/// </summary>
-	[DataMember]
 	public ObservableKeyedList<string, BrightnessProfile> BrightnessProfiles
 	{
 		get => _brightnessProfiles ??= new ObservableKeyedList<string, BrightnessProfile>();
@@ -237,11 +240,12 @@ public class SettingsCore : BindableBase
 		}
 	}
 	private string _fileName = SettingsFileName;
+	private const string BrightnessProfilesFileName = "brightness-profiles.json";
 
     public SettingsCore()
 	{
-		// Ensure BrightnessProfile type is known for DataContractSerializer
-		KnownTypes = new[] { typeof(BrightnessProfile) };
+        // BrightnessProfiles are stored separately as JSON.
+		KnownTypes = Array.Empty<Type>();
 	}
 
 	private Throttle _save;
@@ -249,13 +253,61 @@ public class SettingsCore : BindableBase
 	protected internal virtual async Task InitiateAsync()
 	{
 		await Task.Run(() => Load(this));
+		await Task.Run(LoadBrightnessProfiles);
 
 		_save = new Throttle(
 			TimeSpan.FromMilliseconds(100),
 			() => Save(this));
+		var saveBrightnessProfiles = new Throttle(
+			TimeSpan.FromMilliseconds(100),
+			SaveBrightnessProfiles);
 
 		MonitorCustomizations.CollectionChanged += (_, _) => OnPropertyChanged(nameof(MonitorCustomizations));
+     BrightnessProfiles.CollectionChanged += async (_, _) => await saveBrightnessProfiles.PushAsync();
 		PropertyChanged += async (_, _) => await _save.PushAsync();
+	}
+
+	private void LoadBrightnessProfiles()
+	{
+		try
+		{
+			if (!AppDataService.Exists(BrightnessProfilesFileName, out _))
+				return;
+
+			var json = AppDataService.ReadAsync(BrightnessProfilesFileName).GetAwaiter().GetResult();
+			if (string.IsNullOrWhiteSpace(json))
+				return;
+
+			using var ms = new MemoryStream(Encoding.UTF8.GetBytes(json));
+			var serializer = new DataContractJsonSerializer(typeof(List<BrightnessProfile>));
+			if (serializer.ReadObject(ms) is not List<BrightnessProfile> loaded)
+				return;
+
+			BrightnessProfiles.Clear();
+			foreach (var profile in loaded.Where(x => !string.IsNullOrWhiteSpace(x?.Name)))
+				BrightnessProfiles.Add(profile.Name, profile);
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine("Failed to load brightness profiles from JSON." + Environment.NewLine + ex);
+		}
+	}
+
+	private void SaveBrightnessProfiles()
+	{
+		try
+		{
+			var profiles = BrightnessProfiles.Select(x => x.Value).ToList();
+			using var ms = new MemoryStream();
+			var serializer = new DataContractJsonSerializer(typeof(List<BrightnessProfile>));
+			serializer.WriteObject(ms, profiles);
+			var json = Encoding.UTF8.GetString(ms.ToArray());
+			AppDataService.Write(BrightnessProfilesFileName, append: false, delete: true, json);
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine("Failed to save brightness profiles to JSON." + Environment.NewLine + ex);
+		}
 	}
 
 	#region Load/Save
