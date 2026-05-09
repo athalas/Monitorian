@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 using Monitorian.Core.Collections;
 using Monitorian.Core.Common;
@@ -27,7 +28,8 @@ public class SettingsCore : BindableBase
 		get => _usesLargeElements;
 		set => SetProperty(ref _usesLargeElements, value);
 	}
-	private bool _usesLargeElements = true; // Default
+
+    private bool _usesLargeElements = true; // Default
 
 	/// <summary>
 	/// Whether to use accent color for brightness

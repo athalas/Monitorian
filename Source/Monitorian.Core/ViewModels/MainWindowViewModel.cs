@@ -1,5 +1,4 @@
 ﻿using System;
-using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
@@ -13,6 +12,32 @@ using System.Windows;
 using System.Windows.Input;
 
 namespace Monitorian.Core.ViewModels;
+
+internal class RelayCommand : System.Windows.Input.ICommand
+{
+	private readonly Action<object> _execute;
+	private readonly Func<object, bool> _canExecute;
+
+	public event EventHandler CanExecuteChanged;
+
+	public RelayCommand(Action execute, Func<bool> canExecute = null)
+	{
+		_execute = _ => execute();
+		_canExecute = _ => canExecute?.Invoke() ?? true;
+	}
+
+	public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
+	{
+		_execute = execute ?? throw new ArgumentNullException(nameof(execute));
+		_canExecute = canExecute ?? (_ => true);
+	}
+
+	public bool CanExecute(object parameter) => _canExecute(parameter);
+
+	public void Execute(object parameter) => _execute(parameter);
+
+	public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+}
 
 public class MainWindowViewModel : ViewModelBase
 {
@@ -91,11 +116,11 @@ public class MainWindowViewModel : ViewModelBase
 
 	private void SaveProfile()
 	{
-		// Prompt for name if none selected
+        // Prompt for name if none selected
 		var name = SelectedProfileName;
 		if (string.IsNullOrWhiteSpace(name))
 		{
-			var prompt = new Views.InputDialog("Enter profile name", "Profile name:");
+            var prompt = new Views.InputDialog("Enter profile name", "Profile name:");
 			if (prompt.ShowDialog() is not true)
 				return;
 			name = prompt.ResponseText;
