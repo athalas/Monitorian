@@ -1,4 +1,5 @@
 ﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 
@@ -20,5 +21,8 @@ namespace Monitorian.Core.Models
 
         [DataMember]
         public Dictionary<string, int> Values { get; set; } = new();
+
+        [DataMember]
+        public Dictionary<string, bool> SleepModeEnabledStates { get; set; } = new();
     }
 }

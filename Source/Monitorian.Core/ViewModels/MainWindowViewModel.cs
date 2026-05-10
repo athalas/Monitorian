@@ -78,7 +78,7 @@ public class MainWindowViewModel : ViewModelBase
 		if (!Settings.BrightnessProfiles.TryGetValue(SelectedProfileName, out var profile))
 			return;
 
-		foreach (var kv in profile.Values)
+      foreach (var kv in profile.Values)
 		{
 			var monitor = _controller.Monitors.FirstOrDefault(x => string.Equals(x.DeviceInstanceId, kv.Key, StringComparison.OrdinalIgnoreCase));
 			if (monitor is not null)
@@ -86,6 +86,13 @@ public class MainWindowViewModel : ViewModelBase
 				var brightness = Math.Max(0, Math.Min(100, kv.Value));
 				monitor.SetBrightness(brightness);
 			}
+		}
+
+      foreach (var kv in profile.SleepModeEnabledStates ?? Enumerable.Empty<KeyValuePair<string, bool>>())
+		{
+			var monitor = _controller.Monitors.FirstOrDefault(x => string.Equals(x.DeviceInstanceId, kv.Key, StringComparison.OrdinalIgnoreCase));
+			if (monitor is not null)
+				monitor.IsSleepModeEnabled = kv.Value;
 		}
 	}
 
@@ -121,11 +128,18 @@ public class MainWindowViewModel : ViewModelBase
 				return;
 		}
 
-		var values = new Dictionary<string, int>();
+     var values = new Dictionary<string, int>();
+		var sleepModeStates = new Dictionary<string, bool>();
 		foreach (var monitor in _controller.Monitors)
+     {
 			values[monitor.DeviceInstanceId] = monitor.Brightness;
+			sleepModeStates[monitor.DeviceInstanceId] = monitor.IsSleepModeEnabled;
+		}
 
-		Settings.BrightnessProfiles.Add(name, new BrightnessProfile(name, values));
+      Settings.BrightnessProfiles.Add(name, new BrightnessProfile(name, values)
+		{
+			SleepModeEnabledStates = sleepModeStates
+		});
 		RefreshProfileNames();
 		SelectedProfileName = name;
 	}
