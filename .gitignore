@@ -240,3 +240,7 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
+
+# PRV notes and prompts
+_notes_prv/
+
