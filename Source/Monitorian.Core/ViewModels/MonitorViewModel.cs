@@ -369,19 +369,19 @@ public class MonitorViewModel : ViewModelBase
      if (TrySetPowerMode(PowerModeSleepValues, allowFallback: true))
 		{
 			_sleepModeMethod = SleepModeMethod.DdcCi;
-			return SetProperty(ref _isSleepModeEnabled, true);
+			return SetProperty(ref _isSleepModeEnabled, true, nameof(IsSleepModeEnabled));
 		}
 
 		if (TrySetBrightnessZero())
 		{
 			_sleepModeMethod = SleepModeMethod.BrightnessZero;
-			return SetProperty(ref _isSleepModeEnabled, true);
+			return SetProperty(ref _isSleepModeEnabled, true, nameof(IsSleepModeEnabled));
 		}
 
 		if (TryShowBlackOverlay())
 		{
 			_sleepModeMethod = SleepModeMethod.BlackOverlay;
-			return SetProperty(ref _isSleepModeEnabled, true);
+			return SetProperty(ref _isSleepModeEnabled, true, nameof(IsSleepModeEnabled));
 		}
 
 		_sleepModeMethod = SleepModeMethod.None;
@@ -402,10 +402,10 @@ public class MonitorViewModel : ViewModelBase
 		};
 
 		if (success)
-			return SetProperty(ref _isSleepModeEnabled, false);
+			return SetProperty(ref _isSleepModeEnabled, false, nameof(IsSleepModeEnabled));
 
 		_sleepModeMethod = method;
-		return SetProperty(ref _isSleepModeEnabled, true);
+		return SetProperty(ref _isSleepModeEnabled, true, nameof(IsSleepModeEnabled));
 	}
 
 	private bool TrySetPowerMode(int value)
