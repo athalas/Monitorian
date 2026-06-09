@@ -244,3 +244,4 @@ ModelManifest.xml
 # PRV notes and prompts
 _notes_prv/
 
+.vscode/settings.json
