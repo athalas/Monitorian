@@ -13,6 +13,7 @@
     <TargetFrameworkProfile />
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <RuntimeIdentifiers>win</RuntimeIdentifiers>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -35,6 +36,26 @@
     <DocumentationFile>bin\Release\StartupAgency.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Windows">
+      <HintPath>C:\Users\Administrador\.nuget\packages\microsoft.windows.sdk.contracts\10.0.26100.1\ref\netstandard2.0\Windows.WinMD</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Windows.ApplicationModel.Activation.ActivatedEventsContract">
+      <HintPath>C:\Users\Administrador\.nuget\packages\microsoft.windows.sdk.contracts\10.0.26100.1\ref\netstandard2.0\Windows.ApplicationModel.Activation.ActivatedEventsContract.winmd</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Windows.ApplicationModel.StartupTaskContract">
+      <HintPath>C:\Users\Administrador\.nuget\packages\microsoft.windows.sdk.contracts\10.0.26100.1\ref\netstandard2.0\Windows.ApplicationModel.StartupTaskContract.winmd</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Windows.Foundation.FoundationContract">
+      <HintPath>C:\Users\Administrador\.nuget\packages\microsoft.windows.sdk.contracts\10.0.26100.1\ref\netstandard2.0\Windows.Foundation.FoundationContract.winmd</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Windows.Foundation.UniversalApiContract">
+      <HintPath>C:\Users\Administrador\.nuget\packages\microsoft.windows.sdk.contracts\10.0.26100.1\ref\netstandard2.0\Windows.Foundation.UniversalApiContract.winmd</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -55,7 +76,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.SDK.Contracts">
-      <Version>10.0.26100.1</Version>
+      <Version>10.0.19041.1</Version>
     </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
