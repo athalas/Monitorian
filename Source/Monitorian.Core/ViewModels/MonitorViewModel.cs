@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Forms;
 
 using Monitorian.Core.Helper;
 using Monitorian.Core.Models;
@@ -76,7 +77,21 @@ public class MonitorViewModel : ViewModelBase
 	public ConnectionType Connection => _monitor.Connection;
 	public bool IsInternal => _monitor.IsInternal;
     public bool IsSleepModeSupported => 0 < GetSupportedSleepModeMethods().Length;
+	public bool IsSleepModeToggleEnabled => IsSleepModeSupported && !IsPrimaryMonitor;
+	public bool IsPrimaryMonitor => IsPrimaryMonitorRect(_monitor.MonitorRect, Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle());
 	public string SleepModeToolTip => BuildSleepModeToolTip();
+
+	public static bool IsPrimaryMonitorRect(Rect monitorRect, System.Drawing.Rectangle primaryScreenBounds)
+	{
+		if (monitorRect.IsEmpty || primaryScreenBounds.IsEmpty)
+			return false;
+
+		const double tolerance = 0.001;
+		return Math.Abs(monitorRect.Left - primaryScreenBounds.Left) < tolerance
+			&& Math.Abs(monitorRect.Top - primaryScreenBounds.Top) < tolerance
+			&& Math.Abs(monitorRect.Width - primaryScreenBounds.Width) < tolerance
+			&& Math.Abs(monitorRect.Height - primaryScreenBounds.Height) < tolerance;
+	}
 
 	public void RefreshSleepModeSettings()
 	{

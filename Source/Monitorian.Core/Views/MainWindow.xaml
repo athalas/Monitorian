@@ -898,7 +898,7 @@
 							<CheckBox Grid.Column="6"
 									Margin="2,0,8,0"
 									VerticalAlignment="Center"
-									IsEnabled="{Binding IsSleepModeSupported, Mode=OneWay}"
+									IsEnabled="{Binding IsSleepModeToggleEnabled, Mode=OneWay}"
 									IsChecked="{Binding IsSleepModeEnabled, Mode=TwoWay}"
 									ToolTip="{Binding SleepModeToolTip}"
 									ToolTipService.InitialShowDelay="0"
