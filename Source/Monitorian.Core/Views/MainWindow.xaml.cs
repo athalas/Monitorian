@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -23,9 +24,6 @@ public partial class MainWindow : Window
 	private const int WM_SYSKEYDOWN = 0x0104;
 	private const int VK_CONTROL = 0x11;
 	private const int VK_MENU = 0x12;
-	private const int GWL_EXSTYLE = -20;
-	private const int WS_EX_TOOLWINDOW = 0x00000080;
-	private const int WS_EX_APPWINDOW = 0x00000100;
 
 	private readonly StickWindowMover _mover;
    private readonly AppControllerCore _controller;
@@ -60,12 +58,6 @@ public partial class MainWindow : Window
 	[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 	private static extern IntPtr GetModuleHandle(string lpModuleName);
 
-	[DllImport("user32.dll", SetLastError = true)]
-	private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-
-	[DllImport("user32.dll", SetLastError = true)]
-	private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-
 	private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
 	[StructLayout(LayoutKind.Sequential)]
@@ -84,6 +76,9 @@ public partial class MainWindow : Window
 		LanguageService.Switch();
 
 		InitializeComponent();
+
+		// The window has no border and so this title is shown only in the taskbar and Alt+Tab.
+		this.Title = ProductInfo.Title;
 
        this.DataContext = new MainWindowViewModel(_controller);
 
@@ -123,6 +118,18 @@ public partial class MainWindow : Window
 		_hwndSource?.RemoveHook(WndProc);
 
 		base.OnClosed(e);
+	}
+
+	protected override void OnClosing(CancelEventArgs e)
+	{
+		base.OnClosing(e);
+
+		if (e.Cancel)
+			return;
+
+		// This window can be closed from its taskbar button which is shown while it is on
+		// a non-primary monitor. Shut this application down as done from the menu.
+		Application.Current.Shutdown();
 	}
 
 	private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -211,7 +218,7 @@ public partial class MainWindow : Window
 			{
 				// Anchor the window to the taskbar of the monitor where it was minimized.
 				this.CursorLocation = _controller.GetWindowAnchorLocation();
-				this.WindowState = WindowState.Normal; // StateChanged will restore the plain style.
+				this.WindowState = WindowState.Normal; // StateChanged will refresh the taskbar button.
 			}
 
 			this.Topmost = true;
@@ -238,6 +245,9 @@ public partial class MainWindow : Window
 
 			// Set time to prevent hiding procedure from being triggered.
 			_preventionTime = DateTimeOffset.Now + TimeSpan.FromSeconds(0.1);
+
+			// The taskbar button follows the monitor where the window has been shown.
+			UpdateTaskbarButton();
 		}
 		catch (ArgumentException ex) when ((uint)ex.HResult is 0x80070057)
 		{
@@ -321,6 +331,19 @@ public partial class MainWindow : Window
 		}
 	}
 
+	// The taskbar button is shown only while the window is shown on a non-primary monitor.
+	// The ShowInTaskbar property is toggled instead of the extended window styles because
+	// the Window class manages those styles (and the ownership of the window which keeps it
+	// out of the taskbar) and will revert any direct change of them.
+	private void UpdateTaskbarButton()
+	{
+		bool showTaskbarButton = this.IsVisible && _controller.IsMainWindowOnNonPrimaryMonitor;
+		if (this.ShowInTaskbar == showTaskbarButton)
+			return;
+
+		this.ShowInTaskbar = showTaskbarButton;
+	}
+
 	private void MinimizeToTaskbar()
 	{
 		// Specify the monitor where the window is so that the window will be anchored
@@ -328,7 +351,7 @@ public partial class MainWindow : Window
 		this.CursorLocation = _controller.GetWindowAnchorLocation();
 
 		_isTaskbarMinimized = true;
-		ApplyTaskbarButton(true);
+		UpdateTaskbarButton();
 		this.WindowState = WindowState.Minimized;
 	}
 
@@ -336,6 +359,9 @@ public partial class MainWindow : Window
 
 	internal void OnMonitorStateReevaluated()
 	{
+		// The taskbar button follows the monitor where the window is.
+		UpdateTaskbarButton();
+
 		if (!_isTaskbarMinimized)
 			return;
 
@@ -345,33 +371,25 @@ public partial class MainWindow : Window
 		// The window is minimized in the taskbar while it is no longer on a non-primary
 		// monitor. Restore the plain style and hide the window.
 		_isTaskbarMinimized = false;
-		ApplyTaskbarButton(false);
 		ClearHide();
 	}
 
 	private void OnStateChanged(object sender, EventArgs e)
 	{
+		// The taskbar button follows the monitor where the window is and its state.
+		UpdateTaskbarButton();
+
 		if (this.WindowState is not WindowState.Normal || !_isTaskbarMinimized)
 			return;
 
-		// When the window is restored from the taskbar, restore the plain style
-		// which has no taskbar button.
+		// When the window is restored from the taskbar, the taskbar button will be kept
+		// as long as the window is still on a non-primary monitor.
 		_isTaskbarMinimized = false;
-		ApplyTaskbarButton(false);
 
 		// Set time to prevent hiding procedure from being triggered during the restoration.
 		_preventionTime = DateTimeOffset.Now + TimeSpan.FromSeconds(0.2);
 
 		_controller.RefreshMonitorSleepToggleStates();
-	}
-
-	private void ApplyTaskbarButton(bool show)
-	{
-		var exStyle = GetWindowLong(_windowHandle, GWL_EXSTYLE);
-		exStyle = show
-			? (exStyle & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
-			: (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
-		SetWindowLong(_windowHandle, GWL_EXSTYLE, exStyle);
 	}
 
 	public async void ClearHide()
@@ -383,6 +401,9 @@ public partial class MainWindow : Window
 		await Task.Delay(TimeSpan.FromSeconds(0.1));
 
 		this.Hide();
+
+		// The taskbar button is no longer necessary.
+		UpdateTaskbarButton();
 	}
 
 	#endregion
