@@ -244,21 +244,8 @@ ModelManifest.xml
 # PRV notes and prompts
 _notes_prv/
 
-.vscode/settings.json
-_screenshots/Captura de pantalla 2026-04-14 000611.png
-_screenshots/Captura de pantalla 2026-04-14 000624.png
-_screenshots/Captura de pantalla 2026-04-14 001730.png
-_screenshots/Captura de pantalla 2026-04-14 005044.png
-_screenshots/Captura de pantalla 2026-04-14 012636.png
-_screenshots/Captura de pantalla 2026-04-14 013553.png
-_screenshots/Captura de pantalla 2026-04-14 094218.png
-_screenshots/Captura de pantalla 2026-04-14 094546.png
-_screenshots/Captura de pantalla 2026-04-14 094602.png
-_screenshots/Captura de pantalla 2026-04-14 145649.png
-_screenshots/Captura de pantalla 2026-04-14 145738.png
-_screenshots/Captura de pantalla 2026-04-14 150255.png
-_screenshots/Captura de pantalla 2026-04-14 150533.png
-_screenshots/Captura de pantalla 2026-04-14 152131.png
-_screenshots/Captura de pantalla 2026-04-14 152148.png
-_screenshots/Captura de pantalla 2026-04-14 154241.png
-_screenshots/Captura de pantalla 2026-05-09 104715.png
+.vscode/
+.zcode/
+
+_screenshots/
+
