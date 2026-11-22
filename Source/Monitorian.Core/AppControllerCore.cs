@@ -242,8 +242,18 @@ public class AppControllerCore
 	/// <summary>
 	/// Refreshes the states of the sleep toggles and the placement behavior of the main window.
 	/// </summary>
+	/// <remarks>
+	/// This method can be called from a non-UI thread when the monitors collection changes
+	/// since CollectionChanged event is raised on the thread which changes the collection.
+	/// </remarks>
 	internal void RefreshMonitorSleepToggleStates()
 	{
+		if (!_current.Dispatcher.CheckAccess())
+		{
+			_current.Dispatcher.Invoke(RefreshMonitorSleepToggleStates);
+			return;
+		}
+
 		foreach (var monitor in Monitors.ToArray())
 			monitor.RefreshSleepModeSettings();
 
