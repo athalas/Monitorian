@@ -16,13 +16,16 @@ namespace Monitorian.Core.Views;
 
 public partial class MainWindow : Window
 {
-   private const int HotkeyId = 0x7248;
+	private const int HotkeyId = 0x7248;
 	private const uint WM_HOTKEY = 0x0312;
 	private const int WH_KEYBOARD_LL = 13;
 	private const int WM_KEYDOWN = 0x0100;
 	private const int WM_SYSKEYDOWN = 0x0104;
 	private const int VK_CONTROL = 0x11;
 	private const int VK_MENU = 0x12;
+	private const int GWL_EXSTYLE = -20;
+	private const int WS_EX_TOOLWINDOW = 0x00000080;
+	private const int WS_EX_APPWINDOW = 0x00000100;
 
 	private readonly StickWindowMover _mover;
    private readonly AppControllerCore _controller;
@@ -30,6 +33,7 @@ public partial class MainWindow : Window
 	private readonly HwndSource _hwndSource;
   private readonly LowLevelKeyboardProc _keyboardProc;
 	private readonly IntPtr _keyboardHookHandle;
+	private bool _isTaskbarMinimized;
 	public MainWindowViewModel ViewModel => (MainWindowViewModel)this.DataContext;
 
 	[DllImport("user32.dll", SetLastError = true)]
@@ -55,6 +59,12 @@ public partial class MainWindow : Window
 
 	[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 	private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
 	private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
@@ -90,6 +100,9 @@ public partial class MainWindow : Window
 			KeepsDistance = true
 		};
 		_mover.ForegroundWindowChanged += OnDeactivated;
+
+		this.StateChanged += OnStateChanged;
+		this.LocationChanged += (_, _) => _controller.RefreshMonitorSleepToggleStates();
 
        _controller.WindowPainter.Add(this);
 		_controller.WindowPainter.ThemeChanged += (_, _) =>
@@ -180,6 +193,8 @@ public partial class MainWindow : Window
 
 	#region Show/Hide
 
+	internal IntPtr WindowHandle => _windowHandle;
+
 	internal Point? CursorLocation
 	{
 		get => _mover.CursorLocation;
@@ -192,6 +207,13 @@ public partial class MainWindow : Window
 	{
 		try
 		{
+			if (this.WindowState is WindowState.Minimized)
+			{
+				// Anchor the window to the taskbar of the monitor where it was minimized.
+				this.CursorLocation = _controller.GetWindowAnchorLocation();
+				this.WindowState = WindowState.Normal; // StateChanged will restore the plain style.
+			}
+
 			this.Topmost = true;
 
 			// When a window is deactivated, a focused element will lose focus and usually,
@@ -272,6 +294,10 @@ public partial class MainWindow : Window
 		if (this.Visibility is not Visibility.Visible)
 			return;
 
+		// The window is already minimized in the taskbar.
+		if (this.WindowState is WindowState.Minimized)
+			return;
+
 		// Compare time to prevent hiding procedure from repeating.
 		if (_preventionTime > DateTimeOffset.Now)
 			return;
@@ -281,7 +307,68 @@ public partial class MainWindow : Window
 		// Set time to prevent this window from being shown unintentionally.
 		_preventionTime = DateTimeOffset.Now + TimeSpan.FromSeconds(0.2);
 
+		// When the window is on an awake non-primary monitor, minimize it to the taskbar
+		// of that monitor instead of hiding it, so that it remains reachable even when
+		// the primary monitor which hosts the notification area is asleep.
+		if (_controller.IsPrimaryMonitorSleepAllowed)
+		{
+			MinimizeToTaskbar();
+		}
+		else
+		{
+			ClearHide();
+		}
+	}
+
+	private void MinimizeToTaskbar()
+	{
+		// Specify the monitor where the window is so that the window will be anchored
+		// to the taskbar of that monitor when it is restored.
+		this.CursorLocation = _controller.GetWindowAnchorLocation();
+
+		_isTaskbarMinimized = true;
+		ApplyTaskbarButton(true);
+		this.WindowState = WindowState.Minimized;
+	}
+
+	internal void OnMonitorStateReevaluated()
+	{
+		if (!_isTaskbarMinimized)
+			return;
+
+		if (_controller.IsPrimaryMonitorSleepAllowed)
+			return;
+
+		// The window is minimized in the taskbar while it is no longer on an awake
+		// non-primary monitor. Restore the plain style and hide the window.
+		_isTaskbarMinimized = false;
+		ApplyTaskbarButton(false);
 		ClearHide();
+	}
+
+	private void OnStateChanged(object sender, EventArgs e)
+	{
+		if (this.WindowState is not WindowState.Normal || !_isTaskbarMinimized)
+			return;
+
+		// When the window is restored from the taskbar, restore the plain style
+		// which has no taskbar button.
+		_isTaskbarMinimized = false;
+		ApplyTaskbarButton(false);
+
+		// Set time to prevent hiding procedure from being triggered during the restoration.
+		_preventionTime = DateTimeOffset.Now + TimeSpan.FromSeconds(0.2);
+
+		_controller.RefreshMonitorSleepToggleStates();
+	}
+
+	private void ApplyTaskbarButton(bool show)
+	{
+		var exStyle = GetWindowLong(_windowHandle, GWL_EXSTYLE);
+		exStyle = show
+			? (exStyle & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
+			: (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
+		SetWindowLong(_windowHandle, GWL_EXSTYLE, exStyle);
 	}
 
 	public async void ClearHide()

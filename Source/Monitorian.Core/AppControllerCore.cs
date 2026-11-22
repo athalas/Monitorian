@@ -184,13 +184,89 @@ public class AppControllerCore
 		ShowMenuWindow(e);
 	}
 
+	/// <summary>
+	/// Whether the primary monitor can be put to sleep. It is allowed only while the main window
+	/// is on an awake non-primary monitor, so that at least that monitor remains available.
+	/// </summary>
+	public bool IsPrimaryMonitorSleepAllowed
+	{
+		get
+		{
+			if (_current.MainWindow is not MainWindow window)
+				return false;
+
+			var windowMonitorRect = GetMonitorRectByWindowHandle(window.WindowHandle);
+			if (windowMonitorRect is null)
+				return false;
+
+			var monitor = Monitors.FirstOrDefault(x => MonitorViewModel.IsSameMonitorRect(x.MonitorRect, windowMonitorRect.Value));
+			if (monitor is null)
+				return false;
+
+			var primaryScreenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? System.Drawing.Rectangle.Empty;
+			var primaryScreenRect = primaryScreenBounds.IsEmpty
+				? Rect.Empty
+				: new Rect(primaryScreenBounds.Left, primaryScreenBounds.Top, primaryScreenBounds.Width, primaryScreenBounds.Height);
+
+			return MonitorViewModel.IsPrimaryMonitorSleepAllowed(windowMonitorRect.Value, monitor.IsSleepModeEnabled, primaryScreenRect);
+		}
+	}
+
+	private static Rect? GetMonitorRectByWindowHandle(IntPtr windowHandle)
+	{
+		// The bounds are in physical pixels as well as MonitorRect of a monitor.
+		var bounds = System.Windows.Forms.Screen.FromHandle(windowHandle).Bounds;
+		if (bounds.IsEmpty)
+			return null;
+
+		return new Rect(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+	}
+
+	/// <summary>
+	/// Attempts to get the location to anchor the main window to the taskbar of the monitor where the window is.
+	/// </summary>
+	/// <returns>Center location of that monitor in physical pixels</returns>
+	internal Point? GetWindowAnchorLocation()
+	{
+		if (_current.MainWindow is not MainWindow window)
+			return null;
+
+		var windowMonitorRect = GetMonitorRectByWindowHandle(window.WindowHandle);
+		if (windowMonitorRect is null)
+			return null;
+
+		return new Point(windowMonitorRect.Value.Left + windowMonitorRect.Value.Width / 2D,
+			windowMonitorRect.Value.Top + windowMonitorRect.Value.Height / 2D);
+	}
+
+	/// <summary>
+	/// Refreshes the states of the sleep toggles and the placement behavior of the main window.
+	/// </summary>
+	internal void RefreshMonitorSleepToggleStates()
+	{
+		foreach (var monitor in Monitors.ToArray())
+			monitor.RefreshSleepModeSettings();
+
+		(_current.MainWindow as MainWindow)?.OnMonitorStateReevaluated();
+	}
+
 	protected virtual void ShowMainWindow(bool useCursorLocation = false)
 	{
 		var window = (MainWindow)_current.MainWindow;
 		if (window is { CanBeShown: false } or { Visibility: Visibility.Visible, IsForeground: true })
 			return;
 
-		window.CursorLocation = useCursorLocation ? CursorHelper.GetCursorLocation() : null;
+		if (window.WindowState is WindowState.Minimized)
+		{
+			// Anchor the window to the taskbar of the monitor where it was minimized.
+			window.CursorLocation = GetWindowAnchorLocation();
+			window.WindowState = WindowState.Normal;
+		}
+		else
+		{
+			window.CursorLocation = useCursorLocation ? CursorHelper.GetCursorLocation() : null;
+		}
+
 		window.ShowForeground();
 		window.Activate();
 	}
@@ -234,6 +310,12 @@ public class AppControllerCore
 
 		if (monitors.All(x => x.IsSleepModeEnabled))
 			return true;
+
+		// When the main window is on an awake non-primary monitor, keep the monitors asleep
+		// so that the state will not be broken by any key operation. The window is minimized
+		// in the taskbar of that monitor and the monitors can be woken from it.
+		if (IsPrimaryMonitorSleepAllowed)
+			return false;
 
         var workArea = SystemParameters.WorkArea;
 		var gapWidth = SystemParameters.PrimaryScreenWidth - workArea.Width;

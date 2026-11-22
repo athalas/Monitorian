@@ -76,26 +76,46 @@ public class MonitorViewModel : ViewModelBase
 	public Rect MonitorRect => _monitor.MonitorRect;
 	public ConnectionType Connection => _monitor.Connection;
 	public bool IsInternal => _monitor.IsInternal;
-    public bool IsSleepModeSupported => 0 < GetSupportedSleepModeMethods().Length;
-	public bool IsSleepModeToggleEnabled => IsSleepModeSupported && !IsPrimaryMonitor;
+	public bool IsSleepModeSupported => 0 < GetSupportedSleepModeMethods().Length;
+	public bool IsSleepModeToggleEnabled => IsSleepModeToggleEnabledCore(IsSleepModeSupported, IsPrimaryMonitor, _controller.IsPrimaryMonitorSleepAllowed);
 	public bool IsPrimaryMonitor => IsPrimaryMonitorRect(_monitor.MonitorRect, Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle());
 	public string SleepModeToolTip => BuildSleepModeToolTip();
 
-	public static bool IsPrimaryMonitorRect(Rect monitorRect, System.Drawing.Rectangle primaryScreenBounds)
+	internal static bool IsSleepModeToggleEnabledCore(bool isSleepModeSupported, bool isPrimaryMonitor, bool isPrimaryMonitorSleepAllowed) =>
+		isSleepModeSupported && (!isPrimaryMonitor || isPrimaryMonitorSleepAllowed);
+
+	public static bool IsPrimaryMonitorRect(Rect monitorRect, System.Drawing.Rectangle primaryScreenBounds) =>
+		IsSameMonitorRect(monitorRect, primaryScreenBounds);
+
+	public static bool IsSameMonitorRect(Rect monitorRect, Rect otherRect)
 	{
-		if (monitorRect.IsEmpty || primaryScreenBounds.IsEmpty)
+		if (monitorRect.IsEmpty || otherRect.IsEmpty)
 			return false;
 
 		const double tolerance = 0.001;
-		return Math.Abs(monitorRect.Left - primaryScreenBounds.Left) < tolerance
-			&& Math.Abs(monitorRect.Top - primaryScreenBounds.Top) < tolerance
-			&& Math.Abs(monitorRect.Width - primaryScreenBounds.Width) < tolerance
-			&& Math.Abs(monitorRect.Height - primaryScreenBounds.Height) < tolerance;
+		return Math.Abs(monitorRect.Left - otherRect.Left) < tolerance
+			&& Math.Abs(monitorRect.Top - otherRect.Top) < tolerance
+			&& Math.Abs(monitorRect.Width - otherRect.Width) < tolerance
+			&& Math.Abs(monitorRect.Height - otherRect.Height) < tolerance;
 	}
+
+	public static bool IsSameMonitorRect(Rect monitorRect, System.Drawing.Rectangle otherRect) =>
+		!otherRect.IsEmpty && IsSameMonitorRect(monitorRect, new Rect(otherRect.Left, otherRect.Top, otherRect.Width, otherRect.Height));
+
+	/// <summary>
+	/// Whether the primary monitor can be put to sleep. It is allowed only while the window
+	/// is on an awake non-primary monitor, so that at least that monitor remains available.
+	/// </summary>
+	public static bool IsPrimaryMonitorSleepAllowed(Rect windowMonitorRect, bool isWindowMonitorAsleep, Rect primaryScreenRect) =>
+		!windowMonitorRect.IsEmpty
+		&& !primaryScreenRect.IsEmpty
+		&& !isWindowMonitorAsleep
+		&& !IsSameMonitorRect(windowMonitorRect, primaryScreenRect);
 
 	public void RefreshSleepModeSettings()
 	{
 		OnPropertyChanged(nameof(IsSleepModeSupported));
+		OnPropertyChanged(nameof(IsSleepModeToggleEnabled));
 		OnPropertyChanged(nameof(SleepModeToolTip));
 	}
 
@@ -243,7 +263,10 @@ public class MonitorViewModel : ViewModelBase
 		if (methods.Length == 0)
 			return "The control is disabled";
 
-     return $"enabled methods: {string.Join(", ", methods.Select(x => $"{x.Name} ({x.Alias})"))}";
+		if (IsPrimaryMonitor && !_controller.IsPrimaryMonitorSleepAllowed)
+			return "The primary monitor can sleep only while Monitorian is shown on an awake non-primary monitor";
+
+		return $"enabled methods: {string.Join(", ", methods.Select(x => $"{x.Name} ({x.Alias})"))}";
 	}
 
 	public bool UpdateBrightness(int value = -1)

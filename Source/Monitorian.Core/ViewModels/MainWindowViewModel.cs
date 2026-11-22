@@ -276,12 +276,16 @@ public class MainWindowViewModel : ViewModelBase
 		}
 
 		OnPropertyChanged(nameof(IsAllSleepModeEnabled));
+		_controller.RefreshMonitorSleepToggleStates();
 	}
 
 	private void OnMonitorPropertyChanged(object sender, PropertyChangedEventArgs e)
 	{
 		if (e.PropertyName == nameof(MonitorViewModel.IsSleepModeEnabled))
+		{
 			OnPropertyChanged(nameof(IsAllSleepModeEnabled));
+			_controller.RefreshMonitorSleepToggleStates();
+		}
 	}
 
 	private void HookMonitorSleepHandlers(IEnumerable<MonitorViewModel> monitors)
