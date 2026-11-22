@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Forms;
 
 using Monitorian.Core.Helper;
 using Monitorian.Core.Models;
@@ -77,15 +76,11 @@ public class MonitorViewModel : ViewModelBase
 	public ConnectionType Connection => _monitor.Connection;
 	public bool IsInternal => _monitor.IsInternal;
 	public bool IsSleepModeSupported => 0 < GetSupportedSleepModeMethods().Length;
-	public bool IsSleepModeToggleEnabled => IsSleepModeToggleEnabledCore(IsSleepModeSupported, IsPrimaryMonitor, _controller.IsPrimaryMonitorSleepAllowed);
-	public bool IsPrimaryMonitor => IsPrimaryMonitorRect(_monitor.MonitorRect, Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle());
+	public bool IsSleepModeToggleEnabled => IsSleepModeToggleEnabledCore(IsSleepModeSupported, _controller.IsSleepAllowed(this));
 	public string SleepModeToolTip => BuildSleepModeToolTip();
 
-	internal static bool IsSleepModeToggleEnabledCore(bool isSleepModeSupported, bool isPrimaryMonitor, bool isPrimaryMonitorSleepAllowed) =>
-		isSleepModeSupported && (!isPrimaryMonitor || isPrimaryMonitorSleepAllowed);
-
-	public static bool IsPrimaryMonitorRect(Rect monitorRect, System.Drawing.Rectangle primaryScreenBounds) =>
-		IsSameMonitorRect(monitorRect, primaryScreenBounds);
+	internal static bool IsSleepModeToggleEnabledCore(bool isSleepModeSupported, bool isSleepAllowed) =>
+		isSleepModeSupported && isSleepAllowed;
 
 	public static bool IsSameMonitorRect(Rect monitorRect, Rect otherRect)
 	{
@@ -103,14 +98,13 @@ public class MonitorViewModel : ViewModelBase
 		!otherRect.IsEmpty && IsSameMonitorRect(monitorRect, new Rect(otherRect.Left, otherRect.Top, otherRect.Width, otherRect.Height));
 
 	/// <summary>
-	/// Whether the primary monitor can be put to sleep. It is allowed only while the window
-	/// is on an awake non-primary monitor, so that at least that monitor remains available.
+	/// Whether the specified monitor can be put to sleep. The monitor where the main window is
+	/// can never be put to sleep, so that the user will not become unable to see Monitorian.
 	/// </summary>
-	public static bool IsPrimaryMonitorSleepAllowed(Rect windowMonitorRect, bool isWindowMonitorAsleep, Rect primaryScreenRect) =>
-		!windowMonitorRect.IsEmpty
-		&& !primaryScreenRect.IsEmpty
-		&& !isWindowMonitorAsleep
-		&& !IsSameMonitorRect(windowMonitorRect, primaryScreenRect);
+	public static bool IsMonitorSleepAllowed(Rect monitorRect, Rect windowMonitorRect) =>
+		monitorRect.IsEmpty
+		|| windowMonitorRect.IsEmpty
+		|| !IsSameMonitorRect(monitorRect, windowMonitorRect);
 
 	public void RefreshSleepModeSettings()
 	{
@@ -263,8 +257,8 @@ public class MonitorViewModel : ViewModelBase
 		if (methods.Length == 0)
 			return "The control is disabled";
 
-		if (IsPrimaryMonitor && !_controller.IsPrimaryMonitorSleepAllowed)
-			return "The primary monitor can sleep only while Monitorian is shown on an awake non-primary monitor";
+		if (!IsMonitorSleepAllowed(MonitorRect, _controller.WindowMonitorRect ?? Rect.Empty))
+			return "The monitor where Monitorian is shown cannot be put to sleep";
 
 		return $"enabled methods: {string.Join(", ", methods.Select(x => $"{x.Name} ({x.Alias})"))}";
 	}

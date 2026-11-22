@@ -25,22 +25,22 @@ public class SleepModePolicyTest
 	}
 
 	[TestMethod]
-	public void IsPrimaryMonitorSleepAllowed_ReturnsTrueOnlyForAwakeNonPrimaryWindowMonitor()
+	public void IsMonitorSleepAllowed_ReturnsFalseOnlyForTheWindowMonitor()
 	{
-		Assert.IsTrue(MonitorViewModel.IsPrimaryMonitorSleepAllowed(SecondaryRect, isWindowMonitorAsleep: false, PrimaryRect));
-		Assert.IsFalse(MonitorViewModel.IsPrimaryMonitorSleepAllowed(PrimaryRect, isWindowMonitorAsleep: false, PrimaryRect)); // Window on the primary monitor
-		Assert.IsFalse(MonitorViewModel.IsPrimaryMonitorSleepAllowed(SecondaryRect, isWindowMonitorAsleep: true, PrimaryRect)); // Window monitor asleep
-		Assert.IsFalse(MonitorViewModel.IsPrimaryMonitorSleepAllowed(Rect.Empty, isWindowMonitorAsleep: false, PrimaryRect));
-		Assert.IsFalse(MonitorViewModel.IsPrimaryMonitorSleepAllowed(SecondaryRect, isWindowMonitorAsleep: false, Rect.Empty));
+		Assert.IsTrue(MonitorViewModel.IsMonitorSleepAllowed(PrimaryRect, SecondaryRect)); // Window on another monitor
+		Assert.IsTrue(MonitorViewModel.IsMonitorSleepAllowed(SecondaryRect, PrimaryRect)); // Window on another monitor
+		Assert.IsFalse(MonitorViewModel.IsMonitorSleepAllowed(PrimaryRect, PrimaryRect)); // Window on this monitor
+		Assert.IsFalse(MonitorViewModel.IsMonitorSleepAllowed(SecondaryRect, SecondaryRect)); // Window on this monitor
+		Assert.IsTrue(MonitorViewModel.IsMonitorSleepAllowed(PrimaryRect, Rect.Empty)); // Window location unknown
+		Assert.IsTrue(MonitorViewModel.IsMonitorSleepAllowed(Rect.Empty, PrimaryRect)); // Monitor location unknown
 	}
 
 	[TestMethod]
-	public void IsSleepModeToggleEnabledCore_EnablesPrimaryOnlyWhenAllowed()
+	public void IsSleepModeToggleEnabledCore_EnablesOnlyWhenSupportedAndSleepAllowed()
 	{
-		Assert.IsTrue(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: true, isPrimaryMonitor: false, isPrimaryMonitorSleepAllowed: false));
-		Assert.IsTrue(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: true, isPrimaryMonitor: true, isPrimaryMonitorSleepAllowed: true));
-		Assert.IsFalse(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: true, isPrimaryMonitor: true, isPrimaryMonitorSleepAllowed: false));
-		Assert.IsFalse(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: false, isPrimaryMonitor: false, isPrimaryMonitorSleepAllowed: false));
-		Assert.IsFalse(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: false, isPrimaryMonitor: true, isPrimaryMonitorSleepAllowed: true));
+		Assert.IsTrue(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: true, isSleepAllowed: true));
+		Assert.IsFalse(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: true, isSleepAllowed: false));
+		Assert.IsFalse(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: false, isSleepAllowed: true));
+		Assert.IsFalse(MonitorViewModel.IsSleepModeToggleEnabledCore(isSleepModeSupported: false, isSleepAllowed: false));
 	}
 }

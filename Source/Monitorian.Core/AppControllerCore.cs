@@ -184,31 +184,26 @@ public class AppControllerCore
 		ShowMenuWindow(e);
 	}
 
+	private Rect? _windowMonitorRect;
+
 	/// <summary>
-	/// Whether the primary monitor can be put to sleep. It is allowed only while the main window
-	/// is on an awake non-primary monitor, so that at least that monitor remains available.
+	/// The bounds of the monitor where the main window currently is, in physical pixels.
 	/// </summary>
-	public bool IsPrimaryMonitorSleepAllowed
+	/// <remarks>
+	/// While the main window is not shown or is minimized, its location does not reflect where
+	/// it will be shown and so the last known location will be returned.
+	/// </remarks>
+	internal Rect? WindowMonitorRect
 	{
 		get
 		{
-			if (_current.MainWindow is not MainWindow window)
-				return false;
-
-			var windowMonitorRect = GetMonitorRectByWindowHandle(window.WindowHandle);
-			if (windowMonitorRect is null)
-				return false;
-
-			var monitor = Monitors.FirstOrDefault(x => MonitorViewModel.IsSameMonitorRect(x.MonitorRect, windowMonitorRect.Value));
-			if (monitor is null)
-				return false;
-
-			var primaryScreenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? System.Drawing.Rectangle.Empty;
-			var primaryScreenRect = primaryScreenBounds.IsEmpty
-				? Rect.Empty
-				: new Rect(primaryScreenBounds.Left, primaryScreenBounds.Top, primaryScreenBounds.Width, primaryScreenBounds.Height);
-
-			return MonitorViewModel.IsPrimaryMonitorSleepAllowed(windowMonitorRect.Value, monitor.IsSleepModeEnabled, primaryScreenRect);
+			if (_current.MainWindow is MainWindow window
+				&& window.IsVisible
+				&& window.WindowState is not WindowState.Minimized)
+			{
+				_windowMonitorRect = GetMonitorRectByWindowHandle(window.WindowHandle);
+			}
+			return _windowMonitorRect;
 		}
 	}
 
@@ -220,6 +215,45 @@ public class AppControllerCore
 			return null;
 
 		return new Rect(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+	}
+
+	private static Rect GetPrimaryScreenRect()
+	{
+		var primaryScreenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? System.Drawing.Rectangle.Empty;
+		return primaryScreenBounds.IsEmpty
+			? Rect.Empty
+			: new Rect(primaryScreenBounds.Left, primaryScreenBounds.Top, primaryScreenBounds.Width, primaryScreenBounds.Height);
+	}
+
+	/// <summary>
+	/// Whether the specified monitor can be put to sleep. The monitor where the main window is
+	/// can never be put to sleep, so that the user will not become unable to see Monitorian.
+	/// When the main window is moved to another monitor, the sleep states will follow it.
+	/// </summary>
+	public bool IsSleepAllowed(MonitorViewModel monitor)
+	{
+		var windowMonitorRect = WindowMonitorRect;
+		if (windowMonitorRect is null)
+			return true;
+
+		return MonitorViewModel.IsMonitorSleepAllowed(monitor.MonitorRect, windowMonitorRect.Value);
+	}
+
+	/// <summary>
+	/// Whether the main window is on a non-primary monitor. In that case, the window will be
+	/// minimized to the taskbar of that monitor instead of hidden, so that it remains reachable
+	/// even when the primary monitor which hosts the notification area is asleep.
+	/// </summary>
+	public bool IsMainWindowOnNonPrimaryMonitor
+	{
+		get
+		{
+			var windowMonitorRect = WindowMonitorRect;
+			if (windowMonitorRect is null)
+				return false;
+
+			return !MonitorViewModel.IsSameMonitorRect(windowMonitorRect.Value, GetPrimaryScreenRect());
+		}
 	}
 
 	/// <summary>
@@ -257,7 +291,29 @@ public class AppControllerCore
 		foreach (var monitor in Monitors.ToArray())
 			monitor.RefreshSleepModeSettings();
 
+		// The monitor where the main window is must be awake so that the user can see Monitorian.
+		WakeWindowMonitorIfAsleep();
+
 		(_current.MainWindow as MainWindow)?.OnMonitorStateReevaluated();
+	}
+
+	private void WakeWindowMonitorIfAsleep()
+	{
+		if (_current.MainWindow is not MainWindow window)
+			return;
+
+		// While the main window is not shown or is minimized, its location does not reflect
+		// where it will be shown and so it must not be relied on.
+		if (!window.IsVisible || (window.WindowState is WindowState.Minimized))
+			return;
+
+		var windowMonitorRect = WindowMonitorRect;
+		if (windowMonitorRect is null)
+			return;
+
+		var monitor = Monitors.FirstOrDefault(x => MonitorViewModel.IsSameMonitorRect(x.MonitorRect, windowMonitorRect.Value));
+		if (monitor is { IsSleepModeEnabled: true })
+			monitor.IsSleepModeEnabled = false;
 	}
 
 	protected virtual void ShowMainWindow(bool useCursorLocation = false)
@@ -279,6 +335,9 @@ public class AppControllerCore
 
 		window.ShowForeground();
 		window.Activate();
+
+		// The monitor where the window has been shown must be awake.
+		RefreshMonitorSleepToggleStates();
 	}
 
 	protected virtual void HideMainWindow()
@@ -321,10 +380,10 @@ public class AppControllerCore
 		if (monitors.All(x => x.IsSleepModeEnabled))
 			return true;
 
-		// When the main window is on an awake non-primary monitor, keep the monitors asleep
-		// so that the state will not be broken by any key operation. The window is minimized
-		// in the taskbar of that monitor and the monitors can be woken from it.
-		if (IsPrimaryMonitorSleepAllowed)
+		// When the main window is reachable on its monitor, keep the monitors asleep so that
+		// the state will not be broken by any key operation. That monitor never sleeps and the
+		// window on it can be used to wake the monitors.
+		if (_current.MainWindow is MainWindow window && (window.IsVisible || window.IsTaskbarMinimized))
 			return false;
 
         var workArea = SystemParameters.WorkArea;
@@ -354,6 +413,10 @@ public class AppControllerCore
 	{
 		foreach (var monitor in Monitors.ToArray())
 		{
+			// The monitor where the main window is must stay awake so that the user can see Monitorian.
+			if (isEnabled && !IsSleepAllowed(monitor))
+				continue;
+
 			monitor.IsSleepModeEnabled = isEnabled;
 		}
 	}

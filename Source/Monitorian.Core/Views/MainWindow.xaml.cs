@@ -307,10 +307,11 @@ public partial class MainWindow : Window
 		// Set time to prevent this window from being shown unintentionally.
 		_preventionTime = DateTimeOffset.Now + TimeSpan.FromSeconds(0.2);
 
-		// When the window is on an awake non-primary monitor, minimize it to the taskbar
-		// of that monitor instead of hiding it, so that it remains reachable even when
-		// the primary monitor which hosts the notification area is asleep.
-		if (_controller.IsPrimaryMonitorSleepAllowed)
+		// When the window is on a non-primary monitor, minimize it to the taskbar of that
+		// monitor instead of hiding it, so that it remains reachable even when the primary
+		// monitor which hosts the notification area is asleep. The monitor where the window
+		// is never sleeps but the primary monitor can.
+		if (_controller.IsMainWindowOnNonPrimaryMonitor)
 		{
 			MinimizeToTaskbar();
 		}
@@ -331,16 +332,18 @@ public partial class MainWindow : Window
 		this.WindowState = WindowState.Minimized;
 	}
 
+	internal bool IsTaskbarMinimized => _isTaskbarMinimized;
+
 	internal void OnMonitorStateReevaluated()
 	{
 		if (!_isTaskbarMinimized)
 			return;
 
-		if (_controller.IsPrimaryMonitorSleepAllowed)
+		if (_controller.IsMainWindowOnNonPrimaryMonitor)
 			return;
 
-		// The window is minimized in the taskbar while it is no longer on an awake
-		// non-primary monitor. Restore the plain style and hide the window.
+		// The window is minimized in the taskbar while it is no longer on a non-primary
+		// monitor. Restore the plain style and hide the window.
 		_isTaskbarMinimized = false;
 		ApplyTaskbarButton(false);
 		ClearHide();

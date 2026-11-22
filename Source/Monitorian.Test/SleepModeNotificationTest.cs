@@ -15,14 +15,6 @@ namespace Monitorian.Test;
 public class SleepModeNotificationTest
 {
 	[TestMethod]
-	public void IsPrimaryMonitorRect_ReturnsTrueOnlyForThePrimaryScreenBounds()
-	{
-		Assert.IsTrue(MonitorViewModel.IsPrimaryMonitorRect(new Rect(0, 0, 1920, 1080), new System.Drawing.Rectangle(0, 0, 1920, 1080)));
-		Assert.IsFalse(MonitorViewModel.IsPrimaryMonitorRect(new Rect(1921, 0, 1920, 1080), new System.Drawing.Rectangle(0, 0, 1920, 1080)));
-		Assert.IsFalse(MonitorViewModel.IsPrimaryMonitorRect(Rect.Empty, new System.Drawing.Rectangle(0, 0, 1920, 1080)));
-	}
-
-	[TestMethod]
 	public void IsSleepModeEnabled_RaisesPropertyChangedForTheBoundProperty()
 	{
 		var app = new Application();

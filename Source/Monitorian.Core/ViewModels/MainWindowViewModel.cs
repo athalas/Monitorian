@@ -91,7 +91,8 @@ public class MainWindowViewModel : ViewModelBase
       foreach (var kv in profile.SleepModeEnabledStates ?? Enumerable.Empty<KeyValuePair<string, bool>>())
 		{
 			var monitor = _controller.Monitors.FirstOrDefault(x => string.Equals(x.DeviceInstanceId, kv.Key, StringComparison.OrdinalIgnoreCase));
-			if (monitor is not null)
+			// The monitor where the main window is cannot sleep.
+			if (monitor is not null && _controller.IsSleepAllowed(monitor))
 				monitor.IsSleepModeEnabled = kv.Value;
 		}
 	}
@@ -220,7 +221,8 @@ public class MainWindowViewModel : ViewModelBase
 	{
 		get
 		{
-			var monitors = _controller.Monitors.ToArray();
+			// The monitor where the main window is cannot sleep and so it is out of scope.
+			var monitors = _controller.Monitors.Where(x => _controller.IsSleepAllowed(x)).ToArray();
 			if (monitors.Length == 0)
 				return false;
 
