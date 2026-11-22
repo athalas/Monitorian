@@ -1,15 +1,16 @@
 <Project Sdk="WixToolset.Sdk/5.0.2">
   <PropertyGroup>
     <OutputName>Monitorian.Installer</OutputName>
+    <!-- ICE64: the Local AppData working folder is intentionally not removed on uninstall,
+         so that user data (settings, profiles) survives reinstalls and upgrades. -->
+    <SuppressIces>ICE38;ICE43;ICE57;ICE69;ICE64</SuppressIces>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DefineConstants>Debug</DefineConstants>
     <SuppressValidation>False</SuppressValidation>
-    <SuppressIces>ICE38;ICE43;ICE57;ICE69</SuppressIces>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <SuppressValidation>False</SuppressValidation>
-    <SuppressIces>ICE38;ICE43;ICE57;ICE69</SuppressIces>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Monitorian\Monitorian.csproj">

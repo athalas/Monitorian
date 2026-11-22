@@ -6,7 +6,11 @@
            Scope="perMachine">
     <SummaryInformation Description="Installer for Monitorian"/>
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
+    <!-- afterInstallValidate guarantees that the uninstall of the previous version,
+         which may still carry the old data-wiping RemoveFile entry, completes before
+         the user data is moved back (or deleted for a clean install) at InstallFinalize. -->
+    <MajorUpgrade Schedule="afterInstallValidate"
+                  DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
 
     <Media Id="1" Cabinet="source.cab" EmbedCab="yes"/>
 
@@ -18,10 +22,19 @@
     <UI>
       <ui:WixUI Id="WixUI_InstallDir"/>
       <UIRef Id="WixUI_ErrorProgressText"/>
+      <DialogRef Id="CleanOptionsDlg"/>
 
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction"
                Value="LaunchApplication"
                Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed"/>
+
+      <!-- Insert CleanOptionsDlg between InstallDirDlg and VerifyReadyDlg
+           (fresh installs and upgrades only; maintenance flows stay untouched).
+           Order values must exceed the ones published by WixUI_InstallDir (4 and 1). -->
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="CleanOptionsDlg" Order="5"
+               Condition="NOT Installed AND (WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID=&quot;1&quot;)"/>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CleanOptionsDlg" Order="3"
+               Condition="NOT Installed"/>
     </UI>
 
     <WixVariable Id="WixUIBannerBmp" Value="Resources\banner.png"/>
@@ -240,8 +253,12 @@
     <!-- Working Folder in Local AppData -->
     <DirectoryRef Id="ApplicationLocalAppDataFolder">
       <Component Id="ApplicationWorkingFolder" Guid="{62E835D6-6CB7-4853-8B11-4EA52E47B33F}">
-        <RemoveFile Id="ApplicationLocalAppDataFiles" Directory="ApplicationLocalAppDataFolder" Name="*.*" On="uninstall"/>
-        <RemoveFolder Id="ApplicationLocalAppDataFolder" On="uninstall"/>
+        <!-- User data in this folder (settings.xml, brightness-profiles.json, logs) is
+             intentionally NOT deleted on uninstall: it must survive reinstalls and upgrades.
+             The previous RemoveFile/RemoveFolder entries here are what wiped it on upgrade,
+             because MSI removes the previously installed product before every upgrade.
+             The only deletion happens through CleanMonitorianData when a clean install is
+             explicitly requested (CLEANINSTALL property). -->
         <RegistryValue Root="HKCU" Key="Software\[ProductName]"
                        Name="ApplicationWorkingFolder" Type="integer" Value="1" KeyPath="yes"/>
       </Component>
@@ -289,12 +306,82 @@
     <Property Id="WixShellExecTarget" Value="$(var.Monitorian.TargetFileName)"/>
     <CustomAction Id="LaunchApplication" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_X86"/>
 
+    <!--
+      User data in Local AppData (settings.xml, brightness-profiles.json, logs) must survive
+      reinstalls, upgrades and uninstall. Previously installed versions still delete the
+      folder when they are removed, which MSI performs against the OLD product on every
+      upgrade (and RemoveFile deletions are not rolled back). To protect the data, a backup
+      copy is taken before the old product is removed and restored afterwards:
+      - BackupMonitorianData mirrors the folder to "<folder>.backup" before InstallValidate.
+        It is a plain copy (no move), so a cancellation before the transaction starts
+        (e.g. at the files-in-use dialog) leaves the original untouched.
+      - RestoreMonitorianDataRollback restores the backup if the transaction is rolled back
+        (the rollback also reinstalls the old product, whose RemoveFile may have deleted
+        the original folder meanwhile).
+      - RestoreMonitorianData restores the backup after the new product is in place.
+      - Only a clean install, explicitly requested with CLEANINSTALL=1 (checkbox in
+        CleanOptionsDlg), deletes the folder and its backup (CleanMonitorianData).
+    -->
+    <!-- Paths are built from [LocalAppDataFolder]Monitorian (not the trailing-backslash
+         directory property) because a backslash before the closing quote escapes it in
+         Windows command-line parsing and corrupts the command. -->
+    <CustomAction Id="BackupMonitorianData" Directory="TARGETDIR" Execute="immediate" Return="ignore"
+                  ExeCommand='[SystemFolder]cmd.exe /c robocopy "[LocalAppDataFolder]Monitorian" "[LocalAppDataFolder]Monitorian.backup" /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS &amp; exit /b 0'/>
+    <CustomAction Id="RestoreMonitorianDataRollback" Directory="TARGETDIR" Execute="rollback" Return="ignore"
+                  ExeCommand='[SystemFolder]cmd.exe /c robocopy "[LocalAppDataFolder]Monitorian.backup" "[LocalAppDataFolder]Monitorian" /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS &amp; exit /b 0'/>
+    <CustomAction Id="RestoreMonitorianData" Directory="TARGETDIR" Execute="immediate" Return="ignore"
+                  ExeCommand='[SystemFolder]cmd.exe /c robocopy "[LocalAppDataFolder]Monitorian.backup" "[LocalAppDataFolder]Monitorian" /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS &amp; rd /s /q "[LocalAppDataFolder]Monitorian.backup" &amp; exit /b 0'/>
+    <CustomAction Id="CleanMonitorianData" Directory="TARGETDIR" Execute="immediate" Return="ignore"
+                  ExeCommand='[SystemFolder]cmd.exe /c rd /s /q "[LocalAppDataFolder]Monitorian" &amp; rd /s /q "[LocalAppDataFolder]Monitorian.backup" &amp; exit /b 0'/>
+
     <!-- Clean Current User Run -->
     <CustomAction Id="CleanCurrentUserRun" Directory="TARGETDIR" Execute="immediate" Return="ignore"
                   ExeCommand="[SystemFolder]reg.exe delete HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v [ProductName] /f"/>
     <InstallExecuteSequence>
+      <Custom Action="BackupMonitorianData" Before="InstallValidate"
+              Condition="NOT REMOVE=&quot;ALL&quot; AND NOT Installed"/>
+      <Custom Action="RestoreMonitorianDataRollback" After="InstallInitialize"/>
+      <Custom Action="RestoreMonitorianData" After="InstallFinalize"
+              Condition="NOT REMOVE=&quot;ALL&quot; AND NOT Installed AND CLEANINSTALL&lt;&gt;&quot;1&quot;"/>
+      <Custom Action="CleanMonitorianData" After="RestoreMonitorianData"
+              Condition="NOT REMOVE=&quot;ALL&quot; AND NOT Installed AND CLEANINSTALL=&quot;1&quot;"/>
       <Custom Action="CleanCurrentUserRun" After="InstallFinalize"
               Condition="(NOT UPGRADINGPRODUCTCODE) AND (REMOVE=&quot;ALL&quot;)"/>
     </InstallExecuteSequence>
   </Package>
+
+  <!-- Clean install options dialog, shown on fresh installs and upgrades only.
+       The checkbox binds to the public CLEANINSTALL property consumed by
+       CleanMonitorianData; it is left undefined (unchecked) by default, so nothing
+       is deleted unless the user explicitly opts in. CLEANINSTALL=1 can also be
+       passed on the msiexec command line for silent clean installs. -->
+  <Fragment>
+    <UI>
+      <Dialog Id="CleanOptionsDlg" Width="370" Height="270" Title="!(loc.InstallDirDlg_Title)">
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Condition="1"/>
+        </Control>
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="InstallDirDlg" Condition="1"/>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" Condition="1"/>
+        </Control>
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes"
+                 Text="{\WixUI_Font_Title}Installation options"/>
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes"
+                 Text="Your existing preferences and profiles are kept."/>
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner"/>
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0"/>
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0"/>
+
+        <Control Id="KeepText" Type="Text" X="25" Y="60" Width="320" Height="40" NoPrefix="yes"
+                 Text="Monitorian keeps your existing settings, monitor customizations, brightness profiles and logs, which are stored in [ApplicationLocalAppDataFolder]."/>
+        <Control Id="CleanInstallCheckbox" Type="CheckBox" X="25" Y="110" Width="320" Height="17"
+                 Property="CLEANINSTALL" CheckBoxValue="1"
+                 Text="Perform a clean install and reset preferences and profiles"/>
+      </Dialog>
+    </UI>
+  </Fragment>
 </Wix>
